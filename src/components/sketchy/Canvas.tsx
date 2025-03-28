@@ -1,13 +1,13 @@
 
 import { useEffect, useRef, useState } from "react";
-import { fabric } from "fabric";
+import { Canvas as FabricCanvas } from "fabric";
 import { toast } from "@/components/ui/use-toast";
 import { useToolStore } from "@/store/tool-store";
 import { useElementStore } from "@/store/element-store";
 
 export const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
+  const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const { activeTool, activeColor, strokeWidth, fillColor } = useToolStore();
   const { addElement } = useElementStore();
   
@@ -15,7 +15,7 @@ export const Canvas = () => {
     if (!canvasRef.current) return;
     
     // Initialize the canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
+    const canvas = new FabricCanvas(canvasRef.current, {
       width: window.innerWidth,
       height: window.innerHeight,
       backgroundColor: "#f8f9fa",
@@ -43,7 +43,7 @@ export const Canvas = () => {
   }, []);
   
   // Create grid pattern
-  const createGrid = (canvas: fabric.Canvas) => {
+  const createGrid = (canvas: FabricCanvas) => {
     const gridSize = 20;
     const canvasWidth = canvas.getWidth() || window.innerWidth;
     const canvasHeight = canvas.getHeight() || window.innerHeight;
