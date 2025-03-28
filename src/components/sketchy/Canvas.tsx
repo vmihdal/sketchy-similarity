@@ -81,7 +81,26 @@ export const Canvas = () => {
       fabricCanvas.freeDrawingBrush.width = strokeWidth;
     }
     
-  }, [activeTool, activeColor, strokeWidth, fabricCanvas]);
+    // Add event listener for path creation to add pencil strokes to elements store
+    const handlePathCreated = (e: any) => {
+      if (activeTool === "pencil" && e.path) {
+        addElement({
+          id: Date.now().toString(),
+          type: "pencil",
+          object: e.path.toObject(),
+        });
+      }
+    };
+    
+    fabricCanvas.on('path:created', handlePathCreated);
+    
+    return () => {
+      if (fabricCanvas) {
+        fabricCanvas.off('path:created', handlePathCreated);
+      }
+    };
+    
+  }, [activeTool, activeColor, strokeWidth, fabricCanvas, addElement]);
   
   // Setup panning and drawing tools
   useEffect(() => {
@@ -193,35 +212,54 @@ export const Canvas = () => {
           const handleMouseUp = () => {
             if (!tempShape) return;
             
+            // Remove event listeners
+            fabricCanvas.off('mouse:move', handleMouseMove);
+            fabricCanvas.off('mouse:up', handleMouseUp);
+            
             // Convert the temporary shape to a permanent one with the same properties
             let finalObject;
             
             if (activeTool === "rectangle") {
-              finalObject = new Rect({
-                left: tempShape.left,
-                top: tempShape.top,
-                width: (tempShape as Rect).width,
-                height: (tempShape as Rect).height,
-                fill: fillColor === "transparent" ? "" : fillColor,
-                stroke: activeColor,
-                strokeWidth: strokeWidth,
-                strokeUniform: true,
-              });
+              // Only create if the rectangle has some size
+              if ((tempShape as Rect).width > 0 && (tempShape as Rect).height > 0) {
+                finalObject = new Rect({
+                  left: tempShape.left,
+                  top: tempShape.top,
+                  width: (tempShape as Rect).width,
+                  height: (tempShape as Rect).height,
+                  fill: fillColor === "transparent" ? "" : fillColor,
+                  stroke: activeColor,
+                  strokeWidth: strokeWidth,
+                  strokeUniform: true,
+                });
+              }
             } else if (activeTool === "circle") {
-              finalObject = new Circle({
-                left: tempShape.left,
-                top: tempShape.top,
-                radius: (tempShape as Circle).radius,
-                fill: fillColor === "transparent" ? "" : fillColor,
-                stroke: activeColor,
-                strokeWidth: strokeWidth,
-                strokeUniform: true,
-              });
+              // Only create if the circle has some radius
+              if ((tempShape as Circle).radius > 0) {
+                finalObject = new Circle({
+                  left: tempShape.left,
+                  top: tempShape.top,
+                  radius: (tempShape as Circle).radius,
+                  fill: fillColor === "transparent" ? "" : fillColor,
+                  stroke: activeColor,
+                  strokeWidth: strokeWidth,
+                  strokeUniform: true,
+                });
+              }
             } else if (activeTool === "line") {
               const line = tempShape as Line;
-              const points = line.get('points') || [];
-              if (points.length >= 2) {
-                finalObject = new Line(points, {
+              // Get points which includes x1, y1, x2, y2
+              const coords = [line.x1, line.y1, line.x2, line.y2];
+              
+              // Only create if it's a valid line (has start and end points that differ)
+              if (
+                coords[0] !== undefined && 
+                coords[1] !== undefined && 
+                coords[2] !== undefined && 
+                coords[3] !== undefined &&
+                (coords[0] !== coords[2] || coords[1] !== coords[3])
+              ) {
+                finalObject = new Line([coords[0], coords[1], coords[2], coords[3]], {
                   stroke: activeColor,
                   strokeWidth: strokeWidth,
                   strokeUniform: true,
@@ -229,10 +267,10 @@ export const Canvas = () => {
               }
             }
             
+            // Remove the temporary shape
+            fabricCanvas.remove(tempShape);
+            
             if (finalObject) {
-              // Remove the temporary shape
-              fabricCanvas.remove(tempShape);
-              
               // Add the finalized shape
               fabricCanvas.add(finalObject);
               fabricCanvas.setActiveObject(finalObject);
@@ -243,16 +281,12 @@ export const Canvas = () => {
                 object: finalObject.toObject(),
               });
               
-              // Reset the temporary object
-              setTempObject(null);
-              
               // Auto-switch to select tool after drawing
               setActiveTool("select");
             }
             
-            // Remove event listeners
-            fabricCanvas.off('mouse:move', handleMouseMove);
-            fabricCanvas.off('mouse:up', handleMouseUp);
+            // Reset the temporary object
+            setTempObject(null);
           };
           
           fabricCanvas.on('mouse:move', handleMouseMove);
