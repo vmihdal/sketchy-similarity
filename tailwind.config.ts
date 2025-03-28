@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,14 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				canvas: {
+					background: '#f8f9fa',
+					grid: '#deddda'
 				}
+			},
+			boxShadow: {
+				'toolbar': '0 1px 5px rgba(0,0,0,0.12)',
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
