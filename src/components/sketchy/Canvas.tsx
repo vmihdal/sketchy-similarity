@@ -1,9 +1,16 @@
 
 import { useEffect, useRef, useState } from "react";
-import { Canvas as FabricCanvas } from "fabric";
+import { Canvas as FabricCanvas, Line, Rect, Circle, Object as FabricObject } from "fabric";
 import { toast } from "@/components/ui/use-toast";
 import { useToolStore } from "@/store/tool-store";
 import { useElementStore } from "@/store/element-store";
+
+// Define interface for objects with custom data
+interface CustomFabricObject extends FabricObject {
+  customData?: {
+    isGrid?: boolean;
+  };
+}
 
 export const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,38 +57,40 @@ export const Canvas = () => {
     
     // Clear existing grid
     canvas.getObjects().forEach(obj => {
-      if (obj.data?.isGrid) {
+      const customObj = obj as CustomFabricObject;
+      if (customObj.customData?.isGrid) {
         canvas.remove(obj);
       }
     });
     
     // Create grid
     for (let i = 0; i < canvasWidth / gridSize; i++) {
-      const line = new fabric.Line([i * gridSize, 0, i * gridSize, canvasHeight], {
+      const line = new Line([i * gridSize, 0, i * gridSize, canvasHeight], {
         stroke: "#deddda",
         selectable: false,
         evented: false,
         strokeWidth: 0.5,
       });
-      line.data = { isGrid: true };
+      (line as CustomFabricObject).customData = { isGrid: true };
       canvas.add(line);
     }
     
     for (let i = 0; i < canvasHeight / gridSize; i++) {
-      const line = new fabric.Line([0, i * gridSize, canvasWidth, i * gridSize], {
+      const line = new Line([0, i * gridSize, canvasWidth, i * gridSize], {
         stroke: "#deddda",
         selectable: false,
         evented: false,
         strokeWidth: 0.5,
       });
-      line.data = { isGrid: true };
+      (line as CustomFabricObject).customData = { isGrid: true };
       canvas.add(line);
     }
     
     // Send grid to back
     canvas.getObjects().forEach(obj => {
-      if (obj.data?.isGrid) {
-        canvas.sendToBack(obj);
+      const customObj = obj as CustomFabricObject;
+      if (customObj.customData?.isGrid) {
+        canvas.sendObjectToBack(obj);
       }
     });
     
@@ -102,7 +111,7 @@ export const Canvas = () => {
     }
     
     // Setup shape creation handlers
-    const handleMouseDown = (e: fabric.IEvent) => {
+    const handleMouseDown = (e: any) => {
       if (activeTool !== "select" && activeTool !== "pencil") {
         // Store the starting point
         const pointer = fabricCanvas.getPointer(e.e);
@@ -110,7 +119,7 @@ export const Canvas = () => {
         const startY = pointer.y;
         
         // Create shape on mouse up
-        const handleMouseUp = (e: fabric.IEvent) => {
+        const handleMouseUp = (e: any) => {
           const pointer = fabricCanvas.getPointer(e.e);
           const endX = pointer.x;
           const endY = pointer.y;
@@ -119,7 +128,7 @@ export const Canvas = () => {
           
           switch (activeTool) {
             case "rectangle":
-              object = new fabric.Rect({
+              object = new Rect({
                 left: Math.min(startX, endX),
                 top: Math.min(startY, endY),
                 width: Math.abs(endX - startX),
@@ -134,7 +143,7 @@ export const Canvas = () => {
               const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2)) / 2;
               const centerX = (startX + endX) / 2;
               const centerY = (startY + endY) / 2;
-              object = new fabric.Circle({
+              object = new Circle({
                 left: centerX - radius,
                 top: centerY - radius,
                 radius: radius,
@@ -145,7 +154,7 @@ export const Canvas = () => {
               });
               break;
             case "line":
-              object = new fabric.Line([startX, startY, endX, endY], {
+              object = new Line([startX, startY, endX, endY], {
                 stroke: activeColor,
                 strokeWidth: strokeWidth,
                 strokeUniform: true,
