@@ -15,12 +15,13 @@ interface CustomFabricObject extends FabricObject {
 export const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
-  const { activeTool, activeColor, strokeWidth, fillColor } = useToolStore();
+  const { activeTool, activeColor, strokeWidth, fillColor, setActiveTool } = useToolStore();
   const { addElement } = useElementStore();
   const [isPanning, setIsPanning] = useState(false);
   const [lastPosX, setLastPosX] = useState(0);
   const [lastPosY, setLastPosY] = useState(0);
   const [tempObject, setTempObject] = useState<FabricObject | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
   
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -37,7 +38,7 @@ export const Canvas = () => {
     // Enable canvas viewportTransform for panning
     canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
     
-    // Initialize the freeDrawingBrush properties
+    // Initialize the freeDrawingBrush properties if it exists
     if (canvas.freeDrawingBrush) {
       canvas.freeDrawingBrush.color = activeColor;
       canvas.freeDrawingBrush.width = strokeWidth;
@@ -53,6 +54,15 @@ export const Canvas = () => {
     };
     
     window.addEventListener("resize", handleResize);
+    
+    // Add object modification event listeners to detect resizing
+    canvas.on('object:scaling', () => {
+      setIsResizing(true);
+    });
+    
+    canvas.on('object:modified', () => {
+      setIsResizing(false);
+    });
     
     return () => {
       window.removeEventListener("resize", handleResize);
@@ -76,6 +86,9 @@ export const Canvas = () => {
     
     // Mouse down handler
     const handleMouseDown = (e: any) => {
+      // If we're resizing, don't do anything else
+      if (isResizing) return;
+      
       // Handle panning if active tool is pan
       if (activeTool === "pan") {
         setIsPanning(true);
@@ -202,12 +215,15 @@ export const Canvas = () => {
                 strokeUniform: true,
               });
             } else if (activeTool === "line") {
-              const points = (tempShape as Line).points;
-              finalObject = new Line([points[0].x, points[0].y, points[1].x, points[1].y], {
-                stroke: activeColor,
-                strokeWidth: strokeWidth,
-                strokeUniform: true,
-              });
+              const line = tempShape as Line;
+              const coords = [line.x1, line.y1, line.x2, line.y2];
+              if (!coords.some(coord => coord === undefined)) {
+                finalObject = new Line([coords[0] || 0, coords[1] || 0, coords[2] || 0, coords[3] || 0], {
+                  stroke: activeColor,
+                  strokeWidth: strokeWidth,
+                  strokeUniform: true,
+                });
+              }
             }
             
             if (finalObject) {
@@ -216,6 +232,8 @@ export const Canvas = () => {
               
               // Add the finalized shape
               fabricCanvas.add(finalObject);
+              fabricCanvas.setActiveObject(finalObject);
+              
               addElement({
                 id: Date.now().toString(),
                 type: activeTool,
@@ -224,6 +242,9 @@ export const Canvas = () => {
               
               // Reset the temporary object
               setTempObject(null);
+              
+              // Auto-switch to select tool after drawing
+              setActiveTool("select");
             }
             
             // Remove event listeners
@@ -288,7 +309,7 @@ export const Canvas = () => {
         }
       }
     };
-  }, [activeTool, fabricCanvas, activeColor, strokeWidth, fillColor, addElement, isPanning, lastPosX, lastPosY, tempObject]);
+  }, [activeTool, fabricCanvas, activeColor, strokeWidth, fillColor, addElement, isPanning, lastPosX, lastPosY, tempObject, isResizing, setActiveTool]);
   
   return (
     <div className="w-full h-screen overflow-hidden bg-canvas-background">

@@ -6,6 +6,7 @@ import { Circle, MousePointer, Pencil, Square, Trash2, Undo, X, Move } from "luc
 import { cn } from "@/lib/utils";
 import { ColorPicker } from "./ColorPicker";
 import { useElementStore } from "@/store/element-store";
+import { toast } from "@/components/ui/use-toast";
 
 export const Toolbar = () => {
   const { 
@@ -108,16 +109,11 @@ export const Toolbar = () => {
               variant="ghost"
               size="icon"
               onClick={() => {
-                if (fabricCanvas) {
-                  clearElements();
-                  fabricCanvas.clear();
-                  fabricCanvas.backgroundColor = "#f8f9fa";
-                  fabricCanvas.renderAll();
-                  toast({
-                    title: "Canvas cleared",
-                    description: "All elements have been removed from the canvas.",
-                  });
-                }
+                clearElements();
+                toast({
+                  title: "Canvas cleared",
+                  description: "All elements have been removed from the canvas.",
+                });
               }}
               className="rounded-md hover:bg-gray-100"
             >
