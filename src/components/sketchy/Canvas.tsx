@@ -32,6 +32,12 @@ export const Canvas = () => {
     // Create grid pattern
     createGrid(canvas);
     
+    // Initialize the freeDrawingBrush properties
+    if (canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.color = activeColor;
+      canvas.freeDrawingBrush.width = strokeWidth;
+    }
+    
     setFabricCanvas(canvas);
     
     // Handle window resize
@@ -47,7 +53,7 @@ export const Canvas = () => {
       window.removeEventListener("resize", handleResize);
       canvas.dispose();
     };
-  }, []);
+  }, [activeColor, strokeWidth, activeTool]);
   
   // Create grid pattern
   const createGrid = (canvas: FabricCanvas) => {
@@ -104,10 +110,10 @@ export const Canvas = () => {
     // Set drawing mode
     fabricCanvas.isDrawingMode = activeTool === "pencil";
     
-    if (activeTool === "pencil") {
-      const brush = fabricCanvas.freeDrawingBrush;
-      brush.color = activeColor;
-      brush.width = strokeWidth;
+    if (activeTool === "pencil" && fabricCanvas.freeDrawingBrush) {
+      // Make sure freeDrawingBrush exists before setting properties
+      fabricCanvas.freeDrawingBrush.color = activeColor;
+      fabricCanvas.freeDrawingBrush.width = strokeWidth;
     }
     
     // Setup shape creation handlers
