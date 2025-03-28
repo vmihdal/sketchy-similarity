@@ -2,9 +2,10 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToolStore } from "@/store/tool-store";
-import { Circle, MousePointer, Pencil, Square, Trash2, Undo, X } from "lucide-react";
+import { Circle, MousePointer, Pencil, Square, Trash2, Undo, X, Move } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ColorPicker } from "./ColorPicker";
+import { useElementStore } from "@/store/element-store";
 
 export const Toolbar = () => {
   const { 
@@ -17,9 +18,12 @@ export const Toolbar = () => {
     fillColor,
     setFillColor 
   } = useToolStore();
+  
+  const { clearElements } = useElementStore();
 
   const tools = [
     { name: "select", icon: MousePointer, tooltip: "Select (V)" },
+    { name: "pan", icon: Move, tooltip: "Pan (H)" },
     { name: "pencil", icon: Pencil, tooltip: "Pencil (P)" },
     { name: "rectangle", icon: Square, tooltip: "Rectangle (R)" },
     { name: "circle", icon: Circle, tooltip: "Circle (C)" },
@@ -104,7 +108,16 @@ export const Toolbar = () => {
               variant="ghost"
               size="icon"
               onClick={() => {
-                // Handle clear
+                if (fabricCanvas) {
+                  clearElements();
+                  fabricCanvas.clear();
+                  fabricCanvas.backgroundColor = "#f8f9fa";
+                  fabricCanvas.renderAll();
+                  toast({
+                    title: "Canvas cleared",
+                    description: "All elements have been removed from the canvas.",
+                  });
+                }
               }}
               className="rounded-md hover:bg-gray-100"
             >
