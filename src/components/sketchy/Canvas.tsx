@@ -31,18 +31,11 @@ export const Canvas = () => {
       width: window.innerWidth,
       height: window.innerHeight,
       backgroundColor: "#f8f9fa",
-      isDrawingMode: activeTool === "pencil",
       selection: activeTool === "select",
     });
     
     // Enable canvas viewportTransform for panning
     canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
-    
-    // Initialize the freeDrawingBrush properties if it exists
-    if (canvas.freeDrawingBrush) {
-      canvas.freeDrawingBrush.color = activeColor;
-      canvas.freeDrawingBrush.width = strokeWidth;
-    }
     
     setFabricCanvas(canvas);
     
@@ -60,6 +53,10 @@ export const Canvas = () => {
       setIsResizing(true);
     });
     
+    canvas.on('object:rotating', () => {
+      setIsResizing(true);
+    });
+    
     canvas.on('object:modified', () => {
       setIsResizing(false);
     });
@@ -68,9 +65,9 @@ export const Canvas = () => {
       window.removeEventListener("resize", handleResize);
       canvas.dispose();
     };
-  }, [activeColor, strokeWidth, activeTool]);
+  }, []);
   
-  // Setup panning and drawing tools
+  // Update canvas properties when tools change
   useEffect(() => {
     if (!fabricCanvas) return;
     
@@ -79,10 +76,16 @@ export const Canvas = () => {
     fabricCanvas.selection = activeTool === "select";
     
     // Update drawing brush properties
-    if (activeTool === "pencil" && fabricCanvas.freeDrawingBrush) {
+    if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = activeColor;
       fabricCanvas.freeDrawingBrush.width = strokeWidth;
     }
+    
+  }, [activeTool, activeColor, strokeWidth, fabricCanvas]);
+  
+  // Setup panning and drawing tools
+  useEffect(() => {
+    if (!fabricCanvas) return;
     
     // Mouse down handler
     const handleMouseDown = (e: any) => {
@@ -216,9 +219,9 @@ export const Canvas = () => {
               });
             } else if (activeTool === "line") {
               const line = tempShape as Line;
-              const coords = [line.x1, line.y1, line.x2, line.y2];
-              if (!coords.some(coord => coord === undefined)) {
-                finalObject = new Line([coords[0] || 0, coords[1] || 0, coords[2] || 0, coords[3] || 0], {
+              const points = line.get('points') || [];
+              if (points.length >= 2) {
+                finalObject = new Line(points, {
                   stroke: activeColor,
                   strokeWidth: strokeWidth,
                   strokeUniform: true,

@@ -32,6 +32,9 @@ export const KeyboardShortcuts = () => {
         case "l":
           setActiveTool("line");
           break;
+        case "h":
+          setActiveTool("pan");
+          break;
         default:
           break;
       }
@@ -42,7 +45,7 @@ export const KeyboardShortcuts = () => {
     // Show toast with keyboard shortcuts on mount
     toast({
       title: "Keyboard Shortcuts",
-      description: "V: Select, P: Pencil, R: Rectangle, C: Circle, L: Line",
+      description: "V: Select, P: Pencil, R: Rectangle, C: Circle, L: Line, H: Pan",
       duration: 5000,
     });
 
