@@ -8,7 +8,7 @@ import { useCanvas } from './hooks/useCanvas';
  */
 export const Canvas: React.FC = () => {
   // Initialize the canvas with the custom hook
-  const { canvas } = useCanvas('canvas');
+  useCanvas('canvas');
 
   return (
     <div className="canvas-container w-full h-full">

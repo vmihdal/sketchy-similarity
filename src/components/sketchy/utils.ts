@@ -63,7 +63,7 @@ export const getDefaultObjectProps = (
     transparentCorners: false,
     cornerColor: '#0ea5e9',
     cornerSize: 8,
-    cornerStyle: 'circle',
+    cornerStyle: 'circle' as 'circle' | 'rect',
     lockUniScaling: false,
   };
 };

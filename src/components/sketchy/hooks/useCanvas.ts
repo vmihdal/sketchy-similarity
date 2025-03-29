@@ -1,6 +1,18 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { Canvas as FabricCanvas, TEvent, Object as FabricObject, Rect, Circle, Line } from 'fabric';
+import { 
+  Canvas as FabricCanvas, 
+  Object as FabricObject,
+  Rect, 
+  Circle, 
+  Line,
+  TClassProperties,
+  TPointerEventInfo,
+  TPointerEvent,
+  SelectionEvent,
+  ModifiedEvent,
+  Point
+} from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
 import { generateUniqueId, fabricObjectToData, getDefaultObjectProps } from '../utils';
@@ -42,14 +54,20 @@ export const useCanvas = (canvasId: string) => {
     canvasRef.current = canvas;
 
     // Set up event handlers for object selection
-    canvas.on('selection:created', (e: TEvent<'selection:created'>) => handleObjectSelection(e));
-    canvas.on('selection:updated', (e: TEvent<'selection:updated'>) => handleObjectSelection(e));
+    canvas.on('selection:created', (options: SelectionEvent) => {
+      handleObjectSelection(options);
+    });
+    
+    canvas.on('selection:updated', (options: SelectionEvent) => {
+      handleObjectSelection(options);
+    });
+    
     canvas.on('selection:cleared', () => selectElement(null));
 
     // Set up event handlers for object modifications
-    canvas.on('object:modified', (e: TEvent<'object:modified'>) => {
-      if (e.target) {
-        const obj = e.target as ExtendedFabricObject;
+    canvas.on('object:modified', (options: ModifiedEvent) => {
+      if (options.target) {
+        const obj = options.target as ExtendedFabricObject;
         const id = obj.data?.id;
         if (id) {
           updateElement(id, { object: fabricObjectToData(obj) });
@@ -74,10 +92,9 @@ export const useCanvas = (canvasId: string) => {
   }, []);
 
   // Handle object selection
-  const handleObjectSelection = (e: TEvent<'selection:created' | 'selection:updated'>) => {
-    const selectedObjects = e.selected;
-    if (selectedObjects && selectedObjects.length > 0) {
-      const obj = selectedObjects[0] as ExtendedFabricObject;
+  const handleObjectSelection = (options: SelectionEvent) => {
+    if (options.selected && options.selected.length > 0) {
+      const obj = options.selected[0] as ExtendedFabricObject;
       if (obj && obj.data?.id) {
         selectElement(obj.data.id);
       }
@@ -141,7 +158,7 @@ export const useCanvas = (canvasId: string) => {
     canvas.off('mouse:up');
 
     // For path creation (pencil)
-    canvas.on('path:created', (e: any) => {
+    canvas.on('path:created', (e: { path: FabricObject }) => {
       if (e.path) {
         const id = generateUniqueId();
         const pathObj = e.path as ExtendedFabricObject;
@@ -155,13 +172,16 @@ export const useCanvas = (canvasId: string) => {
     });
 
     // Mouse down handler
-    canvas.on('mouse:down', (options: TEvent<'mouse:down'>) => {
+    canvas.on('mouse:down', (options: TPointerEventInfo<TPointerEvent>) => {
       if (activeTool === 'pan') {
         canvas.defaultCursor = 'grabbing';
         canvas.hoverCursor = 'grabbing';
         canvas.isDragging = true;
-        canvas.lastPosX = options.e.offsetX;
-        canvas.lastPosY = options.e.offsetY;
+        
+        if (options.e) {
+          canvas.lastPosX = options.e.clientX;
+          canvas.lastPosY = options.e.clientY;
+        }
         return;
       }
 
@@ -184,6 +204,7 @@ export const useCanvas = (canvasId: string) => {
               width: 0,
               height: 0,
               ...defaultProps,
+              cornerStyle: 'circle' as 'circle' | 'rect',
             });
             obj = rect as unknown as ExtendedFabricObject;
             break;
@@ -194,6 +215,7 @@ export const useCanvas = (canvasId: string) => {
               top: pointer.y,
               radius: 0,
               ...defaultProps,
+              cornerStyle: 'circle' as 'circle' | 'rect',
             });
             obj = circle as unknown as ExtendedFabricObject;
             break;
@@ -201,6 +223,7 @@ export const useCanvas = (canvasId: string) => {
           case 'line': {
             const line = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
               ...defaultProps,
+              cornerStyle: 'circle' as 'circle' | 'rect',
             });
             obj = line as unknown as ExtendedFabricObject;
             break;
@@ -217,16 +240,18 @@ export const useCanvas = (canvasId: string) => {
     });
 
     // Mouse move handler
-    canvas.on('mouse:move', (options: TEvent<'mouse:move'>) => {
+    canvas.on('mouse:move', (options: TPointerEventInfo<TPointerEvent>) => {
       if (activeTool === 'pan' && canvas.isDragging) {
+        if (!options.e) return;
+        
         const e = options.e;
         const vpt = canvas.viewportTransform;
-        if (vpt) {
-          vpt[4] += e.offsetX - (canvas.lastPosX || 0);
-          vpt[5] += e.offsetY - (canvas.lastPosY || 0);
+        if (vpt && canvas.lastPosX && canvas.lastPosY) {
+          vpt[4] += e.clientX - canvas.lastPosX;
+          vpt[5] += e.clientY - canvas.lastPosY;
           canvas.requestRenderAll();
-          canvas.lastPosX = e.offsetX;
-          canvas.lastPosY = e.offsetY;
+          canvas.lastPosX = e.clientX;
+          canvas.lastPosY = e.clientY;
         }
         return;
       }
