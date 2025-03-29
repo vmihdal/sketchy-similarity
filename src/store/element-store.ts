@@ -12,6 +12,7 @@ interface ElementState {
   selectedElementId: string | null;
   addElement: (element: Element) => void;
   removeElement: (id: string) => void;
+  removeSelectedElement: () => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
   selectElement: (id: string | null) => void;
   clearElements: () => void;
@@ -27,6 +28,14 @@ export const useElementStore = create<ElementState>((set) => ({
       elements: state.elements.filter((el) => el.id !== id),
       selectedElementId: state.selectedElementId === id ? null : state.selectedElementId
     })),
+  removeSelectedElement: () =>
+    set((state) => {
+      if (!state.selectedElementId) return state;
+      return { 
+        elements: state.elements.filter((el) => el.id !== state.selectedElementId),
+        selectedElementId: null
+      };
+    }),
   updateElement: (id, updates) => 
     set((state) => ({
       elements: state.elements.map((el) => 

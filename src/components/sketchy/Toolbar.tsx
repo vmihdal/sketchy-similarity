@@ -20,7 +20,7 @@ export const Toolbar = () => {
     setFillColor 
   } = useToolStore();
   
-  const { clearElements } = useElementStore();
+  const { clearElements, removeSelectedElement } = useElementStore();
 
   const tools = [
     { name: "select", icon: MousePointer, tooltip: "Select (V)" },
@@ -91,7 +91,11 @@ export const Toolbar = () => {
               variant="ghost"
               size="icon"
               onClick={() => {
-                // Handle undo
+                // Handle undo (placeholder for future implementation)
+                toast({
+                  title: "Undo not implemented",
+                  description: "Undo functionality will be added in a future update.",
+                });
               }}
               className="rounded-md hover:bg-gray-100"
             >
@@ -109,6 +113,28 @@ export const Toolbar = () => {
               variant="ghost"
               size="icon"
               onClick={() => {
+                removeSelectedElement();
+                toast({
+                  title: "Object deleted",
+                  description: "Selected object has been removed from the canvas.",
+                });
+              }}
+              className="rounded-md hover:bg-gray-100"
+            >
+              <Trash2 className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Delete selected (Del)</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
                 clearElements();
                 toast({
                   title: "Canvas cleared",
@@ -117,7 +143,7 @@ export const Toolbar = () => {
               }}
               className="rounded-md hover:bg-gray-100"
             >
-              <Trash2 className="h-5 w-5" />
+              <Trash2 className="h-5 w-5 text-red-500" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">

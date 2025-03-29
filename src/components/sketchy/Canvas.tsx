@@ -15,7 +15,13 @@ interface CustomFabricObject extends FabricObject {
 export const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
-  const { activeTool, activeColor, strokeWidth, fillColor, setActiveTool } = useToolStore();
+  const { 
+    activeTool, 
+    activeColor, 
+    strokeWidth, 
+    fillColor, 
+    setActiveTool 
+  } = useToolStore();
   const { addElement } = useElementStore();
   const [isPanning, setIsPanning] = useState(false);
   const [lastPosX, setLastPosX] = useState(0);
@@ -61,6 +67,10 @@ export const Canvas = () => {
       setIsResizing(false);
     });
     
+    // Initialize freeDrawingBrush with correct properties
+    canvas.freeDrawingBrush.color = activeColor;
+    canvas.freeDrawingBrush.width = strokeWidth;
+    
     return () => {
       window.removeEventListener("resize", handleResize);
       canvas.dispose();
@@ -81,17 +91,24 @@ export const Canvas = () => {
       fabricCanvas.freeDrawingBrush.width = strokeWidth;
     }
     
-    // Add event listener for path creation to add pencil strokes to elements store
+    // Setup the path creation listener for pencil strokes
     const handlePathCreated = (e: any) => {
-      if (activeTool === "pencil" && e.path) {
+      if (e.path) {
         addElement({
           id: Date.now().toString(),
           type: "pencil",
           object: e.path.toObject(),
         });
+        
+        // Auto-switch to select tool after drawing
+        setActiveTool("select");
       }
     };
     
+    // Clean up previous listener to avoid duplicates
+    fabricCanvas.off('path:created');
+    
+    // Add the path:created listener
     fabricCanvas.on('path:created', handlePathCreated);
     
     return () => {
@@ -100,7 +117,32 @@ export const Canvas = () => {
       }
     };
     
-  }, [activeTool, activeColor, strokeWidth, fabricCanvas, addElement]);
+  }, [activeTool, activeColor, strokeWidth, fabricCanvas, addElement, setActiveTool]);
+
+  // Apply color and stroke changes to selected object
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    
+    const activeObject = fabricCanvas.getActiveObject();
+    if (activeObject && activeTool === "select") {
+      if (typeof activeObject.set === 'function') {
+        // Apply stroke properties
+        activeObject.set({
+          stroke: activeColor,
+          strokeWidth: strokeWidth
+        });
+        
+        // Apply fill if the object supports it (rectangles, circles)
+        if ('fill' in activeObject) {
+          activeObject.set({
+            fill: fillColor === "transparent" ? "" : fillColor
+          });
+        }
+        
+        fabricCanvas.renderAll();
+      }
+    }
+  }, [activeColor, strokeWidth, fillColor, fabricCanvas, activeTool]);
   
   // Setup panning and drawing tools
   useEffect(() => {
@@ -249,21 +291,22 @@ export const Canvas = () => {
             } else if (activeTool === "line") {
               const line = tempShape as Line;
               // Get points which includes x1, y1, x2, y2
-              const coords = [line.x1, line.y1, line.x2, line.y2];
+              const points = line.points || [];
               
-              // Only create if it's a valid line (has start and end points that differ)
-              if (
-                coords[0] !== undefined && 
-                coords[1] !== undefined && 
-                coords[2] !== undefined && 
-                coords[3] !== undefined &&
-                (coords[0] !== coords[2] || coords[1] !== coords[3])
-              ) {
-                finalObject = new Line([coords[0], coords[1], coords[2], coords[3]], {
-                  stroke: activeColor,
-                  strokeWidth: strokeWidth,
-                  strokeUniform: true,
-                });
+              if (points.length >= 2) {
+                const x1 = points[0].x;
+                const y1 = points[0].y;
+                const x2 = points[1].x;
+                const y2 = points[1].y;
+                
+                // Only create if it's a valid line (has start and end points that differ)
+                if ((x1 !== x2 || y1 !== y2)) {
+                  finalObject = new Line([x1, y1, x2, y2], {
+                    stroke: activeColor,
+                    strokeWidth: strokeWidth,
+                    strokeUniform: true,
+                  });
+                }
               }
             }
             
