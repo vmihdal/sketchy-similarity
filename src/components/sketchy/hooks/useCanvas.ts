@@ -6,12 +6,9 @@ import {
   Rect, 
   Circle, 
   Line,
-  TClassProperties,
   TPointerEventInfo,
   TPointerEvent,
-  SelectionEvent,
   ModifiedEvent,
-  Point
 } from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
@@ -54,18 +51,18 @@ export const useCanvas = (canvasId: string) => {
     canvasRef.current = canvas;
 
     // Set up event handlers for object selection
-    canvas.on('selection:created', (options: SelectionEvent) => {
+    canvas.on('selection:created', (options) => {
       handleObjectSelection(options);
     });
     
-    canvas.on('selection:updated', (options: SelectionEvent) => {
+    canvas.on('selection:updated', (options) => {
       handleObjectSelection(options);
     });
     
     canvas.on('selection:cleared', () => selectElement(null));
 
     // Set up event handlers for object modifications
-    canvas.on('object:modified', (options: ModifiedEvent) => {
+    canvas.on('object:modified', (options) => {
       if (options.target) {
         const obj = options.target as ExtendedFabricObject;
         const id = obj.data?.id;
@@ -92,7 +89,7 @@ export const useCanvas = (canvasId: string) => {
   }, []);
 
   // Handle object selection
-  const handleObjectSelection = (options: SelectionEvent) => {
+  const handleObjectSelection = (options: any) => {
     if (options.selected && options.selected.length > 0) {
       const obj = options.selected[0] as ExtendedFabricObject;
       if (obj && obj.data?.id) {
@@ -179,8 +176,9 @@ export const useCanvas = (canvasId: string) => {
         canvas.isDragging = true;
         
         if (options.e) {
-          canvas.lastPosX = options.e.clientX;
-          canvas.lastPosY = options.e.clientY;
+          const e = options.e;
+          canvas.lastPosX = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX;
+          canvas.lastPosY = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY;
         }
         return;
       }
@@ -205,6 +203,7 @@ export const useCanvas = (canvasId: string) => {
               height: 0,
               ...defaultProps,
               cornerStyle: 'circle' as 'circle' | 'rect',
+              selectable: false, // Prevent selection while drawing
             });
             obj = rect as unknown as ExtendedFabricObject;
             break;
@@ -216,6 +215,7 @@ export const useCanvas = (canvasId: string) => {
               radius: 0,
               ...defaultProps,
               cornerStyle: 'circle' as 'circle' | 'rect',
+              selectable: false, // Prevent selection while drawing
             });
             obj = circle as unknown as ExtendedFabricObject;
             break;
@@ -224,6 +224,7 @@ export const useCanvas = (canvasId: string) => {
             const line = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
               ...defaultProps,
               cornerStyle: 'circle' as 'circle' | 'rect',
+              selectable: false, // Prevent selection while drawing
             });
             obj = line as unknown as ExtendedFabricObject;
             break;
@@ -246,12 +247,15 @@ export const useCanvas = (canvasId: string) => {
         
         const e = options.e;
         const vpt = canvas.viewportTransform;
-        if (vpt && canvas.lastPosX && canvas.lastPosY) {
-          vpt[4] += e.clientX - canvas.lastPosX;
-          vpt[5] += e.clientY - canvas.lastPosY;
+        if (vpt && canvas.lastPosX !== undefined && canvas.lastPosY !== undefined) {
+          const clientX = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX;
+          const clientY = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY;
+          
+          vpt[4] += clientX - canvas.lastPosX;
+          vpt[5] += clientY - canvas.lastPosY;
           canvas.requestRenderAll();
-          canvas.lastPosX = e.clientX;
-          canvas.lastPosY = e.clientY;
+          canvas.lastPosX = clientX;
+          canvas.lastPosY = clientY;
         }
         return;
       }
@@ -316,6 +320,9 @@ export const useCanvas = (canvasId: string) => {
       }
 
       if (isDrawing && currentObject) {
+        // Make the object selectable again after drawing
+        currentObject.set({ selectable: true });
+        
         setIsDrawing(false);
         const id = generateUniqueId();
         currentObject.data = { id };
