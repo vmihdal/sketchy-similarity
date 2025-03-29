@@ -1,21 +1,33 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { Canvas as FabricCanvas, IEvent } from 'fabric';
+import { Canvas as FabricCanvas, TEvent, Object as FabricObject, Rect, Circle, Line } from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
 import { generateUniqueId, fabricObjectToData, getDefaultObjectProps } from '../utils';
+
+// Add custom properties to FabricCanvas
+interface ExtendedCanvas extends FabricCanvas {
+  isDragging?: boolean;
+  lastPosX?: number;
+  lastPosY?: number;
+}
+
+// Add custom properties to FabricObject
+interface ExtendedFabricObject extends FabricObject {
+  data?: { id: string };
+}
 
 /**
  * Custom hook to handle canvas interactions and state
  * @param canvasId - The ID of the canvas element
  */
 export const useCanvas = (canvasId: string) => {
-  const canvasRef = useRef<FabricCanvas | null>(null);
+  const canvasRef = useRef<ExtendedCanvas | null>(null);
   const { activeTool, activeColor, strokeWidth, fillColor } = useToolStore();
   const { addElement, selectElement, updateElement } = useElementStore();
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-  const [currentObject, setCurrentObject] = useState<any | null>(null);
+  const [currentObject, setCurrentObject] = useState<ExtendedFabricObject | null>(null);
 
   // Initialize canvas
   useEffect(() => {
@@ -25,19 +37,19 @@ export const useCanvas = (canvasId: string) => {
       backgroundColor: 'white',
       selection: true,
       preserveObjectStacking: true,
-    });
+    }) as ExtendedCanvas;
 
     canvasRef.current = canvas;
 
     // Set up event handlers for object selection
-    canvas.on('selection:created', (e) => handleObjectSelection(e));
-    canvas.on('selection:updated', (e) => handleObjectSelection(e));
+    canvas.on('selection:created', (e: TEvent<'selection:created'>) => handleObjectSelection(e));
+    canvas.on('selection:updated', (e: TEvent<'selection:updated'>) => handleObjectSelection(e));
     canvas.on('selection:cleared', () => selectElement(null));
 
     // Set up event handlers for object modifications
-    canvas.on('object:modified', (e) => {
+    canvas.on('object:modified', (e: TEvent<'object:modified'>) => {
       if (e.target) {
-        const obj = e.target;
+        const obj = e.target as ExtendedFabricObject;
         const id = obj.data?.id;
         if (id) {
           updateElement(id, { object: fabricObjectToData(obj) });
@@ -62,10 +74,13 @@ export const useCanvas = (canvasId: string) => {
   }, []);
 
   // Handle object selection
-  const handleObjectSelection = (e: IEvent) => {
-    const obj = e.selected?.[0];
-    if (obj && obj.data?.id) {
-      selectElement(obj.data.id);
+  const handleObjectSelection = (e: TEvent<'selection:created' | 'selection:updated'>) => {
+    const selectedObjects = e.selected;
+    if (selectedObjects && selectedObjects.length > 0) {
+      const obj = selectedObjects[0] as ExtendedFabricObject;
+      if (obj && obj.data?.id) {
+        selectElement(obj.data.id);
+      }
     }
   };
 
@@ -126,26 +141,27 @@ export const useCanvas = (canvasId: string) => {
     canvas.off('mouse:up');
 
     // For path creation (pencil)
-    canvas.on('path:created', (e) => {
+    canvas.on('path:created', (e: any) => {
       if (e.path) {
         const id = generateUniqueId();
-        e.path.data = { id };
+        const pathObj = e.path as ExtendedFabricObject;
+        pathObj.data = { id };
         addElement({
           id,
           type: 'path',
-          object: fabricObjectToData(e.path),
+          object: fabricObjectToData(pathObj),
         });
       }
     });
 
     // Mouse down handler
-    canvas.on('mouse:down', (options) => {
+    canvas.on('mouse:down', (options: TEvent<'mouse:down'>) => {
       if (activeTool === 'pan') {
         canvas.defaultCursor = 'grabbing';
         canvas.hoverCursor = 'grabbing';
         canvas.isDragging = true;
-        canvas.lastPosX = options.e.clientX;
-        canvas.lastPosY = options.e.clientY;
+        canvas.lastPosX = options.e.offsetX;
+        canvas.lastPosY = options.e.offsetY;
         return;
       }
 
@@ -158,31 +174,37 @@ export const useCanvas = (canvasId: string) => {
         const defaultProps = getDefaultObjectProps(activeColor, strokeWidth, fillColor);
 
         // Create initial object based on tool
-        let obj: any = null;
+        let obj: ExtendedFabricObject | null = null;
 
         switch (activeTool) {
-          case 'rectangle':
-            obj = new fabric.Rect({
+          case 'rectangle': {
+            const rect = new Rect({
               left: pointer.x,
               top: pointer.y,
               width: 0,
               height: 0,
               ...defaultProps,
             });
+            obj = rect as unknown as ExtendedFabricObject;
             break;
-          case 'circle':
-            obj = new fabric.Circle({
+          }
+          case 'circle': {
+            const circle = new Circle({
               left: pointer.x,
               top: pointer.y,
               radius: 0,
               ...defaultProps,
             });
+            obj = circle as unknown as ExtendedFabricObject;
             break;
-          case 'line':
-            obj = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+          }
+          case 'line': {
+            const line = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
               ...defaultProps,
             });
+            obj = line as unknown as ExtendedFabricObject;
             break;
+          }
           default:
             break;
         }
@@ -195,16 +217,16 @@ export const useCanvas = (canvasId: string) => {
     });
 
     // Mouse move handler
-    canvas.on('mouse:move', (options) => {
+    canvas.on('mouse:move', (options: TEvent<'mouse:move'>) => {
       if (activeTool === 'pan' && canvas.isDragging) {
         const e = options.e;
         const vpt = canvas.viewportTransform;
         if (vpt) {
-          vpt[4] += e.clientX - canvas.lastPosX;
-          vpt[5] += e.clientY - canvas.lastPosY;
+          vpt[4] += e.offsetX - (canvas.lastPosX || 0);
+          vpt[5] += e.offsetY - (canvas.lastPosY || 0);
           canvas.requestRenderAll();
-          canvas.lastPosX = e.clientX;
-          canvas.lastPosY = e.clientY;
+          canvas.lastPosX = e.offsetX;
+          canvas.lastPosY = e.offsetY;
         }
         return;
       }
@@ -213,8 +235,8 @@ export const useCanvas = (canvasId: string) => {
         const pointer = canvas.getPointer(options.e);
 
         switch (activeTool) {
-          case 'rectangle':
-            const rect = currentObject as fabric.Rect;
+          case 'rectangle': {
+            const rect = currentObject as unknown as Rect;
             const width = Math.abs(pointer.x - startPoint.x);
             const height = Math.abs(pointer.y - startPoint.y);
             rect.set({
@@ -224,8 +246,9 @@ export const useCanvas = (canvasId: string) => {
               height: height,
             });
             break;
-          case 'circle':
-            const circle = currentObject as fabric.Circle;
+          }
+          case 'circle': {
+            const circle = currentObject as unknown as Circle;
             const radius = Math.sqrt(
               Math.pow(pointer.x - startPoint.x, 2) +
               Math.pow(pointer.y - startPoint.y, 2)
@@ -238,13 +261,15 @@ export const useCanvas = (canvasId: string) => {
               radius: radius,
             });
             break;
-          case 'line':
-            const line = currentObject as fabric.Line;
+          }
+          case 'line': {
+            const line = currentObject as unknown as Line;
             line.set({
               x2: pointer.x,
               y2: pointer.y,
             });
             break;
+          }
           default:
             break;
         }

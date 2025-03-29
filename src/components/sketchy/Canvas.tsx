@@ -7,6 +7,7 @@ import { useCanvas } from './hooks/useCanvas';
  * Renders a fabric.js canvas for drawing
  */
 export const Canvas: React.FC = () => {
+  // Initialize the canvas with the custom hook
   const { canvas } = useCanvas('canvas');
 
   return (
