@@ -22,7 +22,7 @@ export const Canvas = () => {
     fillColor, 
     setActiveTool 
   } = useToolStore();
-  const { addElement } = useElementStore();
+  const { addElement, removeSelectedElement } = useElementStore();
   const [isPanning, setIsPanning] = useState(false);
   const [lastPosX, setLastPosX] = useState(0);
   const [lastPosY, setLastPosY] = useState(0);
@@ -68,8 +68,11 @@ export const Canvas = () => {
     });
     
     // Initialize freeDrawingBrush with correct properties
-    canvas.freeDrawingBrush.color = activeColor;
-    canvas.freeDrawingBrush.width = strokeWidth;
+    // This fixes the "Cannot set properties of undefined (setting 'color')" error
+    if (canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.color = activeColor;
+      canvas.freeDrawingBrush.width = strokeWidth;
+    }
     
     return () => {
       window.removeEventListener("resize", handleResize);
@@ -85,7 +88,7 @@ export const Canvas = () => {
     fabricCanvas.isDrawingMode = activeTool === "pencil";
     fabricCanvas.selection = activeTool === "select";
     
-    // Update drawing brush properties
+    // Update drawing brush properties - make sure freeDrawingBrush exists
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = activeColor;
       fabricCanvas.freeDrawingBrush.width = strokeWidth;
@@ -244,6 +247,7 @@ export const Canvas = () => {
                 radius: radius,
               });
             } else if (activeTool === "line") {
+              // For fabric.js v6, we need to modify line coordinates differently
               (tempShape as Line).set({ x2: endX, y2: endY });
             }
             
@@ -290,23 +294,19 @@ export const Canvas = () => {
               }
             } else if (activeTool === "line") {
               const line = tempShape as Line;
-              // Get points which includes x1, y1, x2, y2
-              const points = line.points || [];
+              // For fabric.js v6, access line coordinates directly
+              const x1 = line.x1 || 0;
+              const y1 = line.y1 || 0;
+              const x2 = line.x2 || 0;
+              const y2 = line.y2 || 0;
               
-              if (points.length >= 2) {
-                const x1 = points[0].x;
-                const y1 = points[0].y;
-                const x2 = points[1].x;
-                const y2 = points[1].y;
-                
-                // Only create if it's a valid line (has start and end points that differ)
-                if ((x1 !== x2 || y1 !== y2)) {
-                  finalObject = new Line([x1, y1, x2, y2], {
-                    stroke: activeColor,
-                    strokeWidth: strokeWidth,
-                    strokeUniform: true,
-                  });
-                }
+              // Only create if it's a valid line (has start and end points that differ)
+              if ((x1 !== x2 || y1 !== y2)) {
+                finalObject = new Line([x1, y1, x2, y2], {
+                  stroke: activeColor,
+                  strokeWidth: strokeWidth,
+                  strokeUniform: true,
+                });
               }
             }
             
