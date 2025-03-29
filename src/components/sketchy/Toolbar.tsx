@@ -2,11 +2,11 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToolStore } from "@/store/tool-store";
-import { Circle, MousePointer, Pencil, Square, Trash2, Undo, X, Move } from "lucide-react";
+import { Circle, MousePointer, Pencil, Square, X, Move } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ColorPicker } from "./ColorPicker";
 import { useElementStore } from "@/store/element-store";
-import { toast } from "@/components/ui/use-toast";
+import { useEffect, useState } from "react";
 
 export const Toolbar = () => {
   const { 
@@ -20,7 +20,75 @@ export const Toolbar = () => {
     setFillColor 
   } = useToolStore();
   
-  const { clearElements, removeSelectedElement } = useElementStore();
+  const { selectedElementId, elements, updateElement } = useElementStore();
+  
+  // Local state for currently selected object properties
+  const [currentStrokeColor, setCurrentStrokeColor] = useState(activeColor);
+  const [currentStrokeWidth, setCurrentStrokeWidth] = useState(strokeWidth);
+  const [currentFillColor, setCurrentFillColor] = useState(fillColor);
+
+  // Update local state when a different object is selected
+  useEffect(() => {
+    if (selectedElementId) {
+      const selectedElement = elements.find(el => el.id === selectedElementId);
+      if (selectedElement && selectedElement.object) {
+        // Get the properties from the selected object
+        const stroke = selectedElement.object.stroke || activeColor;
+        const width = selectedElement.object.strokeWidth || strokeWidth;
+        const fill = selectedElement.object.fill || fillColor;
+        
+        // Update local state
+        setCurrentStrokeColor(stroke);
+        setCurrentStrokeWidth(width); 
+        setCurrentFillColor(fill === "" ? "transparent" : fill);
+      }
+    } else {
+      // If no object is selected, use the global settings
+      setCurrentStrokeColor(activeColor);
+      setCurrentStrokeWidth(strokeWidth);
+      setCurrentFillColor(fillColor);
+    }
+  }, [selectedElementId, elements, activeColor, strokeWidth, fillColor]);
+
+  // Apply changes to the selected object
+  const handleStrokeColorChange = (color: string) => {
+    setCurrentStrokeColor(color);
+    
+    if (selectedElementId) {
+      updateElement(selectedElementId, {
+        object: { ...elements.find(el => el.id === selectedElementId)?.object, stroke: color }
+      });
+    } else {
+      setActiveColor(color);
+    }
+  };
+
+  const handleStrokeWidthChange = (width: number) => {
+    setCurrentStrokeWidth(width);
+    
+    if (selectedElementId) {
+      updateElement(selectedElementId, {
+        object: { ...elements.find(el => el.id === selectedElementId)?.object, strokeWidth: width }
+      });
+    } else {
+      setStrokeWidth(width);
+    }
+  };
+
+  const handleFillColorChange = (color: string) => {
+    setCurrentFillColor(color);
+    
+    if (selectedElementId) {
+      updateElement(selectedElementId, {
+        object: { 
+          ...elements.find(el => el.id === selectedElementId)?.object, 
+          fill: color === "transparent" ? "" : color 
+        }
+      });
+    } else {
+      setFillColor(color);
+    }
+  };
 
   const tools = [
     { name: "select", icon: MousePointer, tooltip: "Select (V)" },
@@ -59,8 +127,8 @@ export const Toolbar = () => {
       <div className="flex items-center space-x-2 px-2 border-r border-gray-200">
         <ColorPicker 
           label="Stroke" 
-          color={activeColor} 
-          onChange={setActiveColor} 
+          color={currentStrokeColor} 
+          onChange={handleStrokeColorChange} 
         />
         <div className="flex flex-col">
           <span className="text-xs text-gray-500">Width</span>
@@ -68,8 +136,8 @@ export const Toolbar = () => {
             type="range"
             min="1"
             max="20"
-            value={strokeWidth}
-            onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
+            value={currentStrokeWidth}
+            onChange={(e) => handleStrokeWidthChange(parseInt(e.target.value))}
             className="w-24"
           />
         </div>
@@ -78,78 +146,10 @@ export const Toolbar = () => {
       <div className="flex items-center space-x-2 px-2">
         <ColorPicker 
           label="Fill" 
-          color={fillColor} 
-          onChange={setFillColor} 
+          color={currentFillColor} 
+          onChange={handleFillColorChange} 
           allowTransparent 
         />
-      </div>
-
-      <div className="flex space-x-1 border-l border-gray-200 pl-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                // Handle undo (placeholder for future implementation)
-                toast({
-                  title: "Undo not implemented",
-                  description: "Undo functionality will be added in a future update.",
-                });
-              }}
-              className="rounded-md hover:bg-gray-100"
-            >
-              <Undo className="h-5 w-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Undo (Ctrl+Z)</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                removeSelectedElement();
-                toast({
-                  title: "Object deleted",
-                  description: "Selected object has been removed from the canvas.",
-                });
-              }}
-              className="rounded-md hover:bg-gray-100"
-            >
-              <Trash2 className="h-5 w-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Delete selected (Del)</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                clearElements();
-                toast({
-                  title: "Canvas cleared",
-                  description: "All elements have been removed from the canvas.",
-                });
-              }}
-              className="rounded-md hover:bg-gray-100"
-            >
-              <Trash2 className="h-5 w-5 text-red-500" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Clear canvas</p>
-          </TooltipContent>
-        </Tooltip>
       </div>
     </div>
   );

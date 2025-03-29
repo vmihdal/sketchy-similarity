@@ -22,7 +22,7 @@ export const Canvas = () => {
     fillColor, 
     setActiveTool 
   } = useToolStore();
-  const { addElement, removeSelectedElement } = useElementStore();
+  const { addElement, removeSelectedElement, selectElement } = useElementStore();
   const [isPanning, setIsPanning] = useState(false);
   const [lastPosX, setLastPosX] = useState(0);
   const [lastPosY, setLastPosY] = useState(0);
@@ -74,6 +74,29 @@ export const Canvas = () => {
       canvas.freeDrawingBrush.width = strokeWidth;
     }
     
+    // Setup object selection event to update selected element in store
+    canvas.on('selection:created', (e) => {
+      if (e.selected && e.selected[0]) {
+        const objId = (e.selected[0] as any).id;
+        if (objId) {
+          selectElement(objId);
+        }
+      }
+    });
+    
+    canvas.on('selection:updated', (e) => {
+      if (e.selected && e.selected[0]) {
+        const objId = (e.selected[0] as any).id;
+        if (objId) {
+          selectElement(objId);
+        }
+      }
+    });
+    
+    canvas.on('selection:cleared', () => {
+      selectElement(null);
+    });
+    
     return () => {
       window.removeEventListener("resize", handleResize);
       canvas.dispose();
@@ -97,8 +120,12 @@ export const Canvas = () => {
     // Setup the path creation listener for pencil strokes
     const handlePathCreated = (e: any) => {
       if (e.path) {
+        const id = Date.now().toString();
+        // Set id on the path object to reference it later
+        e.path.id = id;
+        
         addElement({
-          id: Date.now().toString(),
+          id: id,
           type: "pencil",
           object: e.path.toObject(),
         });
@@ -122,31 +149,6 @@ export const Canvas = () => {
     
   }, [activeTool, activeColor, strokeWidth, fabricCanvas, addElement, setActiveTool]);
 
-  // Apply color and stroke changes to selected object
-  useEffect(() => {
-    if (!fabricCanvas) return;
-    
-    const activeObject = fabricCanvas.getActiveObject();
-    if (activeObject && activeTool === "select") {
-      if (typeof activeObject.set === 'function') {
-        // Apply stroke properties
-        activeObject.set({
-          stroke: activeColor,
-          strokeWidth: strokeWidth
-        });
-        
-        // Apply fill if the object supports it (rectangles, circles)
-        if ('fill' in activeObject) {
-          activeObject.set({
-            fill: fillColor === "transparent" ? "" : fillColor
-          });
-        }
-        
-        fabricCanvas.renderAll();
-      }
-    }
-  }, [activeColor, strokeWidth, fillColor, fabricCanvas, activeTool]);
-  
   // Setup panning and drawing tools
   useEffect(() => {
     if (!fabricCanvas) return;
@@ -314,12 +316,16 @@ export const Canvas = () => {
             fabricCanvas.remove(tempShape);
             
             if (finalObject) {
+              const id = Date.now().toString();
+              // Set id on the object to reference it later
+              (finalObject as any).id = id;
+              
               // Add the finalized shape
               fabricCanvas.add(finalObject);
               fabricCanvas.setActiveObject(finalObject);
               
               addElement({
-                id: Date.now().toString(),
+                id: id,
                 type: activeTool,
                 object: finalObject.toObject(),
               });
