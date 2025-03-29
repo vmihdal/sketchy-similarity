@@ -4,7 +4,7 @@
  * This file contains helper functions and constants used throughout the sketchy app
  */
 
-import { fabric } from 'fabric';
+import { Object as FabricObject } from 'fabric';
 
 /**
  * Creates a unique ID for elements
@@ -17,7 +17,7 @@ export const generateUniqueId = (): string => {
  * Converts Fabric.js object to a serializable format for storage
  * @param obj - The Fabric.js object to convert
  */
-export const fabricObjectToData = (obj: fabric.Object): any => {
+export const fabricObjectToData = (obj: FabricObject): any => {
   return {
     type: obj.type,
     stroke: obj.stroke,
@@ -26,20 +26,20 @@ export const fabricObjectToData = (obj: fabric.Object): any => {
     opacity: obj.opacity,
     // These properties are specific to different object types
     ...(obj.type === 'rect' && {
-      width: (obj as fabric.Rect).width,
-      height: (obj as fabric.Rect).height,
+      width: (obj as any).width,
+      height: (obj as any).height,
     }),
     ...(obj.type === 'circle' && {
-      radius: (obj as fabric.Circle).radius,
+      radius: (obj as any).radius,
     }),
     ...(obj.type === 'line' && {
-      x1: (obj as fabric.Line).x1,
-      y1: (obj as fabric.Line).y1,
-      x2: (obj as fabric.Line).x2,
-      y2: (obj as fabric.Line).y2,
+      x1: (obj as any).x1,
+      y1: (obj as any).y1,
+      x2: (obj as any).x2,
+      y2: (obj as any).y2,
     }),
     ...(obj.type === 'path' && {
-      path: (obj as fabric.Path).path,
+      path: (obj as any).path,
     }),
   };
 };

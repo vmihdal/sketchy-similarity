@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { fabric } from 'fabric';
+import { Canvas as FabricCanvas, IEvent } from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
 import { generateUniqueId, fabricObjectToData, getDefaultObjectProps } from '../utils';
@@ -10,16 +10,16 @@ import { generateUniqueId, fabricObjectToData, getDefaultObjectProps } from '../
  * @param canvasId - The ID of the canvas element
  */
 export const useCanvas = (canvasId: string) => {
-  const canvasRef = useRef<fabric.Canvas | null>(null);
+  const canvasRef = useRef<FabricCanvas | null>(null);
   const { activeTool, activeColor, strokeWidth, fillColor } = useToolStore();
   const { addElement, selectElement, updateElement } = useElementStore();
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-  const [currentObject, setCurrentObject] = useState<fabric.Object | null>(null);
+  const [currentObject, setCurrentObject] = useState<any | null>(null);
 
   // Initialize canvas
   useEffect(() => {
-    const canvas = new fabric.Canvas(canvasId, {
+    const canvas = new FabricCanvas(canvasId, {
       width: window.innerWidth,
       height: window.innerHeight,
       backgroundColor: 'white',
@@ -62,7 +62,7 @@ export const useCanvas = (canvasId: string) => {
   }, []);
 
   // Handle object selection
-  const handleObjectSelection = (e: fabric.IEvent) => {
+  const handleObjectSelection = (e: IEvent) => {
     const obj = e.selected?.[0];
     if (obj && obj.data?.id) {
       selectElement(obj.data.id);
@@ -83,8 +83,10 @@ export const useCanvas = (canvasId: string) => {
     switch (activeTool) {
       case 'pencil':
         canvas.isDrawingMode = true;
-        canvas.freeDrawingBrush.color = activeColor;
-        canvas.freeDrawingBrush.width = strokeWidth;
+        if (canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush.color = activeColor;
+          canvas.freeDrawingBrush.width = strokeWidth;
+        }
         break;
       case 'select':
         canvas.selection = true;
@@ -100,12 +102,8 @@ export const useCanvas = (canvasId: string) => {
 
     // Ensure the free drawing brush is configured
     if (canvas.freeDrawingBrush) {
-      if (!canvas.freeDrawingBrush.color) {
-        canvas.freeDrawingBrush.color = activeColor;
-      }
-      if (!canvas.freeDrawingBrush.width) {
-        canvas.freeDrawingBrush.width = strokeWidth;
-      }
+      canvas.freeDrawingBrush.color = activeColor;
+      canvas.freeDrawingBrush.width = strokeWidth;
     }
 
     // Clean up any in-progress drawing when tool changes
@@ -160,7 +158,7 @@ export const useCanvas = (canvasId: string) => {
         const defaultProps = getDefaultObjectProps(activeColor, strokeWidth, fillColor);
 
         // Create initial object based on tool
-        let obj: fabric.Object | null = null;
+        let obj: any = null;
 
         switch (activeTool) {
           case 'rectangle':
@@ -201,11 +199,13 @@ export const useCanvas = (canvasId: string) => {
       if (activeTool === 'pan' && canvas.isDragging) {
         const e = options.e;
         const vpt = canvas.viewportTransform;
-        vpt[4] += e.clientX - canvas.lastPosX;
-        vpt[5] += e.clientY - canvas.lastPosY;
-        canvas.requestRenderAll();
-        canvas.lastPosX = e.clientX;
-        canvas.lastPosY = e.clientY;
+        if (vpt) {
+          vpt[4] += e.clientX - canvas.lastPosX;
+          vpt[5] += e.clientY - canvas.lastPosY;
+          canvas.requestRenderAll();
+          canvas.lastPosX = e.clientX;
+          canvas.lastPosY = e.clientY;
+        }
         return;
       }
 
@@ -256,7 +256,9 @@ export const useCanvas = (canvasId: string) => {
     // Mouse up handler
     canvas.on('mouse:up', () => {
       if (activeTool === 'pan') {
-        canvas.setViewportTransform(canvas.viewportTransform);
+        if (canvas.viewportTransform) {
+          canvas.setViewportTransform(canvas.viewportTransform);
+        }
         canvas.isDragging = false;
         canvas.defaultCursor = 'grab';
         canvas.hoverCursor = 'grab';
