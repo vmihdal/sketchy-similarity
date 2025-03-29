@@ -1,8 +1,14 @@
 
-import { SketchyApp } from "@/components/sketchy/App";
+import { AppWrapper } from "@/components/sketchy/AppWrapper";
+import { OptionsPanel } from "@/components/sketchy/OptionsPanel";
 
 const Index = () => {
-  return <SketchyApp />;
+  return (
+    <>
+      <AppWrapper />
+      <OptionsPanel />
+    </>
+  );
 };
 
 export default Index;
