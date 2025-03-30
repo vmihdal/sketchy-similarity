@@ -1,15 +1,16 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { 
-  Canvas as FabricCanvas, 
+import {
+  Canvas as FabricCanvas,
   Object as FabricObject,
-  Rect, 
-  Circle, 
+  Rect,
+  Circle,
   Line,
   TPointerEventInfo,
   TPointerEvent,
   ModifiedEvent,
-  ActiveSelection
+  ActiveSelection,
+  Polyline
 } from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
@@ -25,6 +26,13 @@ interface ExtendedCanvas extends FabricCanvas {
 // Add custom properties to FabricObject
 interface ExtendedFabricObject extends FabricObject {
   data?: { id: string };
+}
+
+class ControlPoint extends Circle {
+}
+
+class PolylineExtended extends Polyline {
+  customControls: [ControlPoint]
 }
 
 /**
@@ -55,11 +63,11 @@ export const useCanvas = (canvasId: string) => {
     canvas.on('selection:created', (options) => {
       handleObjectSelection(options);
     });
-    
+
     canvas.on('selection:updated', (options) => {
       handleObjectSelection(options);
     });
-    
+
     canvas.on('selection:cleared', () => selectElement(null));
 
     // Set up event handlers for object modifications
@@ -71,6 +79,16 @@ export const useCanvas = (canvasId: string) => {
           updateElement(id, { object: fabricObjectToData(obj) });
         }
       }
+      // if (options.target instanceof PolylineExtended) {
+      //   let polyline = options.target as any as PolylineExtended;
+      //   polyline.points.forEach((point, index) => {
+      //     const control = polyline.customControls[index];
+      //     if (control instanceof ControlPoint ) {
+      //       console.log(control.left, control.top, point)
+      //       control.set({ left: point.x, top: point.y, dirty: true });
+      //     }
+      //   })
+      // }
     });
 
     // Handle window resize
@@ -178,7 +196,7 @@ export const useCanvas = (canvasId: string) => {
         canvas.defaultCursor = 'grabbing';
         canvas.hoverCursor = 'grabbing';
         canvas.isDragging = true;
-        
+
         if (options.e) {
           const e = options.e;
           canvas.lastPosX = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX;
@@ -207,7 +225,7 @@ export const useCanvas = (canvasId: string) => {
               height: 0,
               ...defaultProps,
               cornerStyle: 'circle' as 'circle' | 'rect',
-              selectable: true, // Prevent selection while drawing
+              selectable: false, // Prevent selection while drawing
             });
             obj = rect as unknown as ExtendedFabricObject;
             break;
@@ -225,10 +243,13 @@ export const useCanvas = (canvasId: string) => {
             break;
           }
           case 'line': {
-            const line = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+            const line = new PolylineExtended([{ x: pointer.x, y: pointer.y }], {
               ...defaultProps,
-              cornerStyle: 'circle' as 'circle' | 'rect',
-              selectable: false, // Prevent selection while drawing
+              selectable: false,
+              evented: false,
+              objectCaching: false,
+              hasControls: false,
+              hasBorders: false
             });
             obj = line as unknown as ExtendedFabricObject;
             break;
@@ -248,13 +269,13 @@ export const useCanvas = (canvasId: string) => {
     canvas.on('mouse:move', (options: TPointerEventInfo<TPointerEvent>) => {
       if (activeTool === 'pan' && canvas.isDragging) {
         if (!options.e) return;
-        
+
         const e = options.e;
         const vpt = canvas.viewportTransform;
         if (vpt && canvas.lastPosX !== undefined && canvas.lastPosY !== undefined) {
           const clientX = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX;
           const clientY = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY;
-          
+
           vpt[4] += clientX - canvas.lastPosX;
           vpt[5] += clientY - canvas.lastPosY;
           canvas.requestRenderAll();
@@ -296,10 +317,11 @@ export const useCanvas = (canvasId: string) => {
             break;
           }
           case 'line': {
-            const line = currentObject as unknown as Line;
+            const line = currentObject as unknown as PolylineExtended;
+            line.points[1] = { x: pointer.x, y: pointer.y };
             line.set({
-              x2: pointer.x,
-              y2: pointer.y,
+              points: line.points,
+              dirty: true
             });
             break;
           }
@@ -325,9 +347,18 @@ export const useCanvas = (canvasId: string) => {
 
 
       if (isDrawing && currentObject) {
-        // Make the object selectable again after drawing
-        currentObject.set({ selectable: true });
-        
+
+        if (activeTool == 'line') {
+          const line = currentObject as unknown as PolylineExtended;
+          line.points.push(line.points[1]);
+          line.points[1] = getMidpoint(line.points[0], line.points[2]);
+          line.setDimensions()
+          line.set({ points: line.points, dirty: true });
+          createControls(canvasRef, line)
+        } else {
+          currentObject.set({ selectable: true });
+        }
+
         setIsDrawing(false);
         const id = generateUniqueId();
         currentObject.data = { id };
@@ -351,7 +382,9 @@ export const useCanvas = (canvasId: string) => {
     });
 
     canvas.on("mouse:over", (options: TPointerEventInfo<TPointerEvent>) => {
-      options.target.evented = activeTool === 'pencil';
+      if (options.target) {
+        options.target.evented = activeTool === 'pencil' || options.target instanceof ControlPoint || options.target instanceof PolylineExtended;
+      }
     });
 
     return () => {
@@ -420,14 +453,60 @@ export const useCanvas = (canvasId: string) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if ( activeTool !== "select" ) {
+    if (activeTool !== "select") {
       canvas.discardActiveObject();
       canvas.renderAll();
     }
 
-  }, [activeTool] );
+  }, [activeTool]);
 
   return {
     canvas: canvasRef.current,
   };
 };
+
+function createControls(canvasRef, polyline) {
+
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+  const line = polyline as unknown as PolylineExtended;
+  const controlPoints = line.points.map((p, index) => createControlPoint(canvasRef, line, p.x, p.y, index));
+  polyline.customControls = controlPoints;
+  canvas.add(...controlPoints);
+}
+
+function createControlPoint(canvasRef, polyline, x, y, index) {
+  
+  let control = new ControlPoint({
+    left: x,
+    top: y,
+    radius: 6,
+    fill: "white",
+    stroke: "blue",
+    strokeWidth: 1,
+    originX: "center",
+    originY: "center",
+    hasControls: false,
+    hasBorders: false,
+    selectable: true,
+  });
+
+  // Update polyline on dragging the control point
+  control.on("moving", function () {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    polyline.points[index] = { x: control.left, y: control.top }; // Update the polyline's points
+    polyline.set({ points: polyline.points, dirty: true });
+    canvas.renderAll();
+  });
+
+  return control;
+}
+
+function getMidpoint(p1, p2) {
+  return {
+    x: (p1.x + p2.x) / 2,
+    y: (p1.y + p2.y) / 2
+  };
+}
