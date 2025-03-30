@@ -108,6 +108,7 @@ export const useCanvas = (canvasId: string) => {
     canvas.isDrawingMode = false;
     canvas.defaultCursor = 'default';
     canvas.hoverCursor = 'move';
+    canvas.selection = false;
 
     // Configure canvas based on active tool
     switch (activeTool) {
@@ -206,7 +207,7 @@ export const useCanvas = (canvasId: string) => {
               height: 0,
               ...defaultProps,
               cornerStyle: 'circle' as 'circle' | 'rect',
-              selectable: false, // Prevent selection while drawing
+              selectable: true, // Prevent selection while drawing
             });
             obj = rect as unknown as ExtendedFabricObject;
             break;
@@ -322,6 +323,7 @@ export const useCanvas = (canvasId: string) => {
         return;
       }
 
+
       if (isDrawing && currentObject) {
         // Make the object selectable again after drawing
         currentObject.set({ selectable: true });
@@ -344,7 +346,12 @@ export const useCanvas = (canvasId: string) => {
         canvas.setActiveObject(currentObject);
         selectElement(id);
         setActiveTool('select');
+        canvas.requestRenderAll()
       }
+    });
+
+    canvas.on("mouse:over", (options: TPointerEventInfo<TPointerEvent>) => {
+      options.target.evented = activeTool === 'pencil';
     });
 
     return () => {
@@ -356,58 +363,69 @@ export const useCanvas = (canvasId: string) => {
     };
   }, [activeTool, isDrawing, startPoint, currentObject, activeColor, strokeWidth, fillColor]);
 
+  // useEffect(() => {
+  //   const canvas = canvasRef.current;
+  //   if (!canvas) return;
+
+  //   const modified = new Map<string, Element>(
+  //     elements.filter((element) => element.isModified )
+  //             .map((el) => [el.id, el])
+  //   );
+
+  //   const selectedMap = new Map<string, Element>(
+  //     elements.filter((element) => element.selected )
+  //             .map((el) => [el.id, el])
+  //   );
+
+  //   if (modified.size == 0 ) {
+  //     return;
+  //   }
+
+  //   let selected = [];
+
+  //   canvas.getObjects().forEach((obj) => {
+
+  //     let extended = (obj as ExtendedFabricObject);
+  //     let id = extended.data?.id;
+
+  //     if (selectedMap.has(id) ) {
+  //       selected.push(obj);
+  //       obj.set({ dirty: true });
+  //     }
+
+  //     if (modified.has(id)) {
+
+  //       let elem = modified.get(id);
+  //       obj.set({
+  //         fill: elem.object.fill || obj.fill,
+  //         stroke: elem.object.stroke || obj.stroke,
+  //       });
+
+  //       obj.set({ dirty: true });
+  //       elem.isModified = false;
+  //     }
+  //   });
+
+  //   //Dirty hack to avoid crash due to delay in object update?
+  //   if (selected.length < 2 ) {
+  //     const selection = new ActiveSelection(selected, { canvas });
+  //     canvas.setActiveObject(selection);
+  //   }
+
+  //   canvas.renderAll();  // Re-render the modified objects
+
+  // }, [elements] );
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const modified = new Map<string, Element>(
-      elements.filter((element) => element.isModified )
-              .map((el) => [el.id, el])
-    );
-
-    const selectedMap = new Map<string, Element>(
-      elements.filter((element) => element.selected )
-              .map((el) => [el.id, el])
-    );
-
-    if (modified.size == 0 ) {
-      return;
+    if ( activeTool !== "select" ) {
+      canvas.discardActiveObject();
+      canvas.renderAll();
     }
 
-    let selected = [];
-
-    canvas.getObjects().forEach((obj) => {
-
-      let extended = (obj as ExtendedFabricObject);
-      let id = extended.data?.id;
-
-      if (selectedMap.has(id) ) {
-        selected.push(obj);
-        obj.set({ dirty: true });
-      }
-
-      if (modified.has(id)) {
-
-        let elem = modified.get(id);
-        obj.set({
-          fill: elem.object.fill || obj.fill,
-          stroke: elem.object.stroke || obj.stroke,
-        });
-
-        obj.set({ dirty: true });
-        elem.isModified = false;
-      }
-    });
-
-    //Dirty hack to avoid crash due to delay in object update?
-    if (selected.length < 2 ) {
-      const selection = new ActiveSelection(selected, { canvas });
-      canvas.setActiveObject(selection);
-    }
-
-    canvas.renderAll();  // Re-render the modified objects
-
-  }, [elements] );
+  }, [activeTool] );
 
   return {
     canvas: canvasRef.current,
