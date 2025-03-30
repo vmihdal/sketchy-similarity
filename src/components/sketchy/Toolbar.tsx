@@ -2,19 +2,21 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToolStore } from "@/store/tool-store";
-import { Circle, MousePointer, Pencil, Square, X, Move } from "lucide-react";
+import { Circle, MousePointer, Pencil, Square, Slash, Hand } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useElementStore } from "@/store/element-store";
 
 export const Toolbar = () => {
   const { activeTool, setActiveTool } = useToolStore();
+  const { deselectElements } = useElementStore();
   
   const tools = [
+    { name: "pan", icon: Hand, tooltip: "Pan (H)" },
     { name: "select", icon: MousePointer, tooltip: "Select (V)" },
-    { name: "pan", icon: Move, tooltip: "Pan (H)" },
-    { name: "pencil", icon: Pencil, tooltip: "Pencil (P)" },
+    // { name: "pencil", icon: Pencil, tooltip: "Pencil (P)" },
     { name: "rectangle", icon: Square, tooltip: "Rectangle (R)" },
     { name: "circle", icon: Circle, tooltip: "Circle (C)" },
-    { name: "line", icon: X, tooltip: "Line (L)" },
+    { name: "line", icon: Slash, tooltip: "Line (L)" },
   ];
 
   return (
@@ -26,7 +28,10 @@ export const Toolbar = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setActiveTool(tool.name as any)}
+                onClick={() => {
+                  deselectElements()
+                  setActiveTool(tool.name as any)
+                }}
                 className={cn(
                   "rounded-md hover:bg-gray-100",
                   activeTool === tool.name && "bg-gray-100"

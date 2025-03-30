@@ -9,6 +9,7 @@ import {
   TPointerEventInfo,
   TPointerEvent,
   ModifiedEvent,
+  ActiveSelection
 } from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
@@ -32,8 +33,8 @@ interface ExtendedFabricObject extends FabricObject {
  */
 export const useCanvas = (canvasId: string) => {
   const canvasRef = useRef<ExtendedCanvas | null>(null);
-  const { activeTool, activeColor, strokeWidth, fillColor } = useToolStore();
-  const { addElement, selectElement, updateElement } = useElementStore();
+  const { activeTool, activeColor, strokeWidth, fillColor, setActiveTool } = useToolStore();
+  const { addElement, selectElement, updateElement, elements } = useElementStore();
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [currentObject, setCurrentObject] = useState<ExtendedFabricObject | null>(null);
@@ -44,7 +45,7 @@ export const useCanvas = (canvasId: string) => {
       width: window.innerWidth,
       height: window.innerHeight,
       backgroundColor: 'white',
-      selection: true,
+      selection: false,
       preserveObjectStacking: true,
     }) as ExtendedCanvas;
 
@@ -164,6 +165,8 @@ export const useCanvas = (canvasId: string) => {
           id,
           type: 'path',
           object: fabricObjectToData(pathObj),
+          isModified: false,
+          selected: false
         });
       }
     });
@@ -332,12 +335,15 @@ export const useCanvas = (canvasId: string) => {
           id,
           type: currentObject.type || '',
           object: fabricObjectToData(currentObject),
+          isModified: false,
+          selected: false
         });
 
         setCurrentObject(null);
         setStartPoint(null);
         canvas.setActiveObject(currentObject);
         selectElement(id);
+        setActiveTool('select');
       }
     });
 
@@ -349,6 +355,59 @@ export const useCanvas = (canvasId: string) => {
       canvas.off('path:created');
     };
   }, [activeTool, isDrawing, startPoint, currentObject, activeColor, strokeWidth, fillColor]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const modified = new Map<string, Element>(
+      elements.filter((element) => element.isModified )
+              .map((el) => [el.id, el])
+    );
+
+    const selectedMap = new Map<string, Element>(
+      elements.filter((element) => element.selected )
+              .map((el) => [el.id, el])
+    );
+
+    if (modified.size == 0 ) {
+      return;
+    }
+
+    let selected = [];
+
+    canvas.getObjects().forEach((obj) => {
+
+      let extended = (obj as ExtendedFabricObject);
+      let id = extended.data?.id;
+
+      if (selectedMap.has(id) ) {
+        selected.push(obj);
+        obj.set({ dirty: true });
+      }
+
+      if (modified.has(id)) {
+
+        let elem = modified.get(id);
+        obj.set({
+          fill: elem.object.fill || obj.fill,
+          stroke: elem.object.stroke || obj.stroke,
+        });
+
+        obj.set({ dirty: true });
+        elem.isModified = false;
+      }
+    });
+
+    //Dirty hack to avoid crash due to delay in object update?
+    if (selected.length < 2 ) {
+      const selection = new ActiveSelection(selected, { canvas });
+      canvas.setActiveObject(selection);
+    }
+
+    canvas.renderAll();  // Re-render the modified objects
+
+  }, [elements] );
 
   return {
     canvas: canvasRef.current,

@@ -59,7 +59,7 @@ const ALIGN_OPTIONS = [
 ];
 
 export const OptionsPanel = () => {
-  const { selectedElementId, elements, updateElement } = useElementStore();
+  const { elements, updateElement } = useElementStore();
   const { setActiveColor, setStrokeWidth, setFillColor } = useToolStore();
   
   // Local state for currently selected object properties
@@ -73,73 +73,72 @@ export const OptionsPanel = () => {
 
   // Update local state when a different object is selected
   useEffect(() => {
-    if (selectedElementId) {
-      const selectedElement = elements.find(el => el.id === selectedElementId);
-      if (selectedElement && selectedElement.object) {
-        // Get the properties from the selected object
-        const stroke = selectedElement.object.stroke || "#1e1e1e";
-        const width = selectedElement.object.strokeWidth || 2;
-        const fill = selectedElement.object.fill || "transparent";
-        const opacity = selectedElement.object.opacity ? selectedElement.object.opacity * 100 : 100;
-        
-        // Update local state
-        setCurrentStrokeColor(stroke);
-        setCurrentStrokeWidth(width);
-        setCurrentFillColor(fill === "" ? "transparent" : fill);
-        setCurrentOpacity(opacity);
-      }
-    }
-  }, [selectedElementId, elements]);
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+        if (selectedElement.object) {
+          // Get the properties from the selected object
+          const stroke = selectedElement.object.stroke || "#1e1e1e";
+          const width = selectedElement.object.strokeWidth || 2;
+          const fill = selectedElement.object.fill || "transparent";
+          const opacity = selectedElement.object.opacity ? selectedElement.object.opacity * 100 : 100;
+          
+          // Update local state
+          setCurrentStrokeColor(stroke);
+          setCurrentStrokeWidth(width);
+          setCurrentFillColor(fill === "" ? "transparent" : fill);
+          setCurrentOpacity(opacity);
+        }
+    })
+    
+  }, [elements]);
 
   // Apply changes to the selected object
   const handleStrokeColorChange = (color: string) => {
     setCurrentStrokeColor(color);
-    
-    if (selectedElementId) {
-      updateElement(selectedElementId, {
-        object: { ...elements.find(el => el.id === selectedElementId)?.object, stroke: color }
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+      updateElement(selectedElement.id, {
+        object: { ...elements.find(el => el.id === selectedElement.id)?.object, stroke: color, dirty: true }
       });
-    } else {
-      setActiveColor(color);
-    }
+    })
+    
+    setActiveColor(color);
   };
 
   const handleFillColorChange = (color: string) => {
     setCurrentFillColor(color);
-    
-    if (selectedElementId) {
-      updateElement(selectedElementId, {
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+      updateElement(selectedElement.id, {
         object: { 
-          ...elements.find(el => el.id === selectedElementId)?.object, 
+          ...elements.find(el => el.id === selectedElement.id)?.object, 
           fill: color === "transparent" ? "" : color 
         }
       });
-    } else {
-      setFillColor(color);
-    }
+    })
+    setFillColor(color);
   };
 
   const handleStrokeWidthChange = (width: number) => {
     setCurrentStrokeWidth(width);
-    
-    if (selectedElementId) {
-      updateElement(selectedElementId, {
-        object: { ...elements.find(el => el.id === selectedElementId)?.object, strokeWidth: width }
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+      updateElement(selectedElement.id, {
+        object: { ...elements.find(el => el.id === selectedElement.id)?.object, strokeWidth: width }
       });
-    } else {
-      setStrokeWidth(width);
-    }
+    });
+    setStrokeWidth(width);
   };
 
   const handleOpacityChange = (value: number[]) => {
     const opacity = value[0];
     setCurrentOpacity(opacity);
-    
-    if (selectedElementId) {
-      updateElement(selectedElementId, {
-        object: { ...elements.find(el => el.id === selectedElementId)?.object, opacity: opacity / 100 }
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+      updateElement(selectedElement.id, {
+        object: { ...elements.find(el => el.id === selectedElement.id)?.object, opacity: opacity / 100 }
       });
-    }
+    })
   };
 
   const handleStrokeStyleChange = (style: string) => {
@@ -171,9 +170,10 @@ export const OptionsPanel = () => {
   };
 
   const handleDelete = () => {
-    if (selectedElementId) {
-      useElementStore.getState().removeElement(selectedElementId);
-    }
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+      useElementStore.getState().removeElement(selectedElement.id);
+    })
   };
 
   return (
