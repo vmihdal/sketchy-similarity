@@ -352,7 +352,7 @@ export const useCanvas = (canvasId: string) => {
           const line = currentObject as unknown as PolylineExtended;
           line.points.push(line.points[1]);
           line.points[1] = getMidpoint(line.points[0], line.points[2]);
-          line.setDimensions()
+          // line.setDimensions()
           line.set({ points: line.points, dirty: true });
           createControls(canvasRef, line)
         } else {
