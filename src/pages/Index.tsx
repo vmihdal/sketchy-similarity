@@ -7,7 +7,7 @@ const Index = () => {
   return (
     <>
       <AppWrapper />
-      {/* <OptionsPanel /> */}
+      <OptionsPanel />
       {/* {<Playground></Playground>} */}
     </>
   );

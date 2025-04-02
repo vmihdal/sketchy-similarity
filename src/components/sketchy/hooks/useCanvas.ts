@@ -396,58 +396,59 @@ export const useCanvas = (canvasId: string) => {
     };
   }, [activeTool, isDrawing, startPoint, currentObject, activeColor, strokeWidth, fillColor]);
 
-  // useEffect(() => {
-  //   const canvas = canvasRef.current;
-  //   if (!canvas) return;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  //   const modified = new Map<string, Element>(
-  //     elements.filter((element) => element.isModified )
-  //             .map((el) => [el.id, el])
-  //   );
+    const modified = new Map<string, Element>(
+      elements.filter((element) => element.isModified )
+              .map((el) => [el.id, el])
+    );
 
-  //   const selectedMap = new Map<string, Element>(
-  //     elements.filter((element) => element.selected )
-  //             .map((el) => [el.id, el])
-  //   );
+    const selectedMap = new Map<string, Element>(
+      elements.filter((element) => element.selected )
+              .map((el) => [el.id, el])
+    );
 
-  //   if (modified.size == 0 ) {
-  //     return;
-  //   }
+    if (modified.size == 0 ) {
+      return;
+    }
 
-  //   let selected = [];
+    let selected = [];
 
-  //   canvas.getObjects().forEach((obj) => {
+    canvas.getObjects().forEach((obj) => {
 
-  //     let extended = (obj as ExtendedFabricObject);
-  //     let id = extended.data?.id;
+      let extended = (obj as ExtendedFabricObject);
+      let id = extended.data?.id;
 
-  //     if (selectedMap.has(id) ) {
-  //       selected.push(obj);
-  //       obj.set({ dirty: true });
-  //     }
+      if (selectedMap.has(id) ) {
+        selected.push(obj);
+        obj.set({ dirty: true });
+      }
 
-  //     if (modified.has(id)) {
+      if (modified.has(id)) {
 
-  //       let elem = modified.get(id);
-  //       obj.set({
-  //         fill: elem.object.fill || obj.fill,
-  //         stroke: elem.object.stroke || obj.stroke,
-  //       });
+        let elem = modified.get(id);
+        obj.set({
+          fill: elem.object.fill || obj.fill,
+          stroke: elem.object.stroke || obj.stroke,
+          strokeWidth: elem.object.strokeWidth || obj.strokeWidth,
+        });
 
-  //       obj.set({ dirty: true });
-  //       elem.isModified = false;
-  //     }
-  //   });
+        obj.set({ dirty: true });
+        elem.isModified = false;
+      }
+    });
 
-  //   //Dirty hack to avoid crash due to delay in object update?
-  //   if (selected.length < 2 ) {
-  //     const selection = new ActiveSelection(selected, { canvas });
-  //     canvas.setActiveObject(selection);
-  //   }
+    //Dirty hack to avoid crash due to delay in object update?
+    // if (selected.length == 1 ) {
+    //   const selection = new ActiveSelection(selected, { canvas });
+    //   canvas.setActiveObject(selection);
+    // }
 
-  //   canvas.renderAll();  // Re-render the modified objects
+    canvas.renderAll();  // Re-render the modified objects
 
-  // }, [elements] );
+  }, [elements] );
 
   useEffect(() => {
     const canvas = canvasRef.current;
