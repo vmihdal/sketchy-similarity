@@ -427,7 +427,6 @@ export const useCanvas = (canvasId: string) => {
       }
 
       if (modified.has(id)) {
-
         let elem = modified.get(id);
         obj.set({
           fill: elem.object.fill || obj.fill,

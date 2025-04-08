@@ -112,7 +112,7 @@ export const OptionsPanel = () => {
       updateElement(selectedElement.id, {
         object: { 
           ...elements.find(el => el.id === selectedElement.id)?.object, 
-          fill: color === "transparent" ? "" : color 
+          fill: color, dirty: true
         }
       });
     })
