@@ -7,6 +7,7 @@ export interface FabricObjectData {
   strokeWidth?: number;
   fill?: string;
   opacity?: number;
+  cornerRadius?: number,
   [key: string]: any; // For other Fabric.js properties
 }
 
@@ -15,7 +16,9 @@ export interface Element {
   type: string;
   object: FabricObjectData;
   isModified: boolean;
-  selected: boolean
+  selected: boolean;
+  strokeDashArray?: [number];
+  cornerRadius?: number;
 }
 
 interface ElementState {

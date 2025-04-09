@@ -22,12 +22,15 @@ export const fabricObjectToData = (obj: FabricObject): any => {
     type: obj.type,
     stroke: obj.stroke,
     strokeWidth: obj.strokeWidth,
-    fill: obj.fill || "",
+    fill: obj.fill,
     opacity: obj.opacity,
+    strokeDashArray: obj.strokeDashArray,
     // These properties are specific to different object types
     ...(obj.type === 'rect' && {
       width: (obj as any).width,
       height: (obj as any).height,
+      rx: (obj as any).rx,
+      ry: (obj as any).ry,
     }),
     ...(obj.type === 'circle' && {
       radius: (obj as any).radius,
@@ -53,18 +56,22 @@ export const fabricObjectToData = (obj: FabricObject): any => {
 export const getDefaultObjectProps = (
   activeColor: string,
   strokeWidth: number,
-  fillColor: string
+  fillColor: string,
+  strokeDashArray?: [number],
+  cornerRadius?: number
 ) => {
   return {
     stroke: activeColor,
     strokeWidth: strokeWidth,
-    fill: fillColor === "transparent" ? "" : fillColor,
+    fill: fillColor,
+    strokeDashArray: strokeDashArray,
     selectable: true,
     transparentCorners: false,
     cornerColor: '#0ea5e9',
     cornerSize: 8,
     cornerStyle: 'circle' as 'circle' | 'rect',
     lockUniScaling: false,
+    cornerRadius
   };
 };
 

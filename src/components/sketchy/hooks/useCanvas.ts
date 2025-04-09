@@ -10,7 +10,8 @@ import {
   TPointerEvent,
   ModifiedEvent,
   ActiveSelection,
-  Polyline
+  Polyline,
+  Image
 } from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
@@ -41,7 +42,7 @@ class PolylineExtended extends Polyline {
  */
 export const useCanvas = (canvasId: string) => {
   const canvasRef = useRef<ExtendedCanvas | null>(null);
-  const { activeTool, activeColor, strokeWidth, fillColor, setActiveTool } = useToolStore();
+  const { activeTool, activeColor, strokeWidth, fillColor, strokeDashArray, cornerRadius, setActiveTool, copyToggle, toggleCopy, deleteToggle, toggleDelete } = useToolStore();
   const { addElement, selectElement, updateElement, elements } = useElementStore();
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
@@ -99,11 +100,67 @@ export const useCanvas = (canvasId: string) => {
       });
     };
 
+    const handlePaste = (event) => {
+      if (!event.clipboardData) {
+        return
+      }
+
+      const items = event.clipboardData.items;
+
+      const defaultProps = getDefaultObjectProps(activeColor, strokeWidth, fillColor, strokeDashArray, cornerRadius);
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        // Look for image item
+        if (item.type.indexOf('image') !== -1) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+
+          reader.onload = function (event) {
+            Image.fromURL(event.target.result.toString()).then((img) => {
+              img.set({
+                left: 100,
+                top: 100,
+                ... defaultProps,
+              });
+              canvas.add(img);
+              canvas.setActiveObject(img);
+              canvas.renderAll();
+              
+              let current = img as ExtendedFabricObject;
+
+              const id = generateUniqueId();
+              current.data = { id };
+
+              addElement({
+                id,
+                type: current.type || '',
+                object: fabricObjectToData(current),
+                isModified: false,
+                selected: false,
+              });
+      
+              setCurrentObject(null);
+              canvas.setActiveObject(current);
+              selectElement(id);
+              setActiveTool('select');
+              canvas.requestRenderAll()
+            });
+          };
+
+          reader.readAsDataURL(blob);
+        }
+      }
+    };
+
     window.addEventListener('resize', handleResize);
+    window.addEventListener('paste', handlePaste);
 
     return () => {
       canvas.dispose();
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('paste', handlePaste);
     };
   }, []);
 
@@ -185,7 +242,8 @@ export const useCanvas = (canvasId: string) => {
           type: 'path',
           object: fabricObjectToData(pathObj),
           isModified: false,
-          selected: false
+          selected: false,
+          cornerRadius
         });
       }
     });
@@ -211,7 +269,7 @@ export const useCanvas = (canvasId: string) => {
         setStartPoint({ x: pointer.x, y: pointer.y });
 
         // Default properties for all objects
-        const defaultProps = getDefaultObjectProps(activeColor, strokeWidth, fillColor);
+        const defaultProps = getDefaultObjectProps(activeColor, strokeWidth, fillColor, strokeDashArray, cornerRadius);
 
         // Create initial object based on tool
         let obj: ExtendedFabricObject | null = null;
@@ -226,6 +284,8 @@ export const useCanvas = (canvasId: string) => {
               ...defaultProps,
               cornerStyle: 'circle' as 'circle' | 'rect',
               selectable: false, // Prevent selection while drawing
+              rx: defaultProps.cornerRadius,
+              ry: defaultProps.cornerRadius,
             });
             obj = rect as unknown as ExtendedFabricObject;
             break;
@@ -358,7 +418,7 @@ export const useCanvas = (canvasId: string) => {
         } else {
           currentObject.set({ selectable: true });
         }
-
+        
         setIsDrawing(false);
         const id = generateUniqueId();
         currentObject.data = { id };
@@ -369,7 +429,8 @@ export const useCanvas = (canvasId: string) => {
           type: currentObject.type || '',
           object: fabricObjectToData(currentObject),
           isModified: false,
-          selected: false
+          selected: false,
+          cornerRadius
         });
 
         setCurrentObject(null);
@@ -394,7 +455,7 @@ export const useCanvas = (canvasId: string) => {
       canvas.off('mouse:up');
       canvas.off('path:created');
     };
-  }, [activeTool, isDrawing, startPoint, currentObject, activeColor, strokeWidth, fillColor]);
+  }, [activeTool, isDrawing, startPoint, currentObject, activeColor, strokeWidth, fillColor, strokeDashArray, cornerRadius]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -432,6 +493,10 @@ export const useCanvas = (canvasId: string) => {
           fill: elem.object.fill || obj.fill,
           stroke: elem.object.stroke || obj.stroke,
           strokeWidth: elem.object.strokeWidth || obj.strokeWidth,
+          strokeDashArray: elem.object.strokeDashArray,
+          rx: elem.cornerRadius,
+          ry: elem.cornerRadius,
+          opacity: elem.object.opacity
         });
 
         obj.set({ dirty: true });
@@ -459,6 +524,93 @@ export const useCanvas = (canvasId: string) => {
     }
 
   }, [activeTool]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (!copyToggle) {
+      return;
+    }
+
+    toggleCopy();
+
+    const selectedMap = new Map<string, Element>(
+      elements.filter((element) => element.selected )
+              .map((el) => [el.id, el])
+    );
+    const defaultProps = getDefaultObjectProps(activeColor, strokeWidth, fillColor, strokeDashArray, cornerRadius);
+
+      canvas.getActiveObjects().forEach((obj) => {
+
+        if (selectedMap.has((obj as ExtendedFabricObject).data?.id)) {
+          obj.clone().then( clone => {
+            clone.set({
+              left: obj.left + 50,
+              top: obj.top + 50,
+            });
+  
+            Object.keys(defaultProps).forEach((propName) => {
+              clone.set({ [propName]: obj[propName] })
+            })
+  
+            clone.set({
+              dirty: true
+            });
+            canvas.add(clone);
+
+            let current = clone as ExtendedFabricObject;
+
+            const id = generateUniqueId();
+            current.data = { id };
+
+            addElement({
+              id,
+              type: current.type || '',
+              object: fabricObjectToData(current),
+              isModified: false,
+              selected: false,
+            });
+    
+            setCurrentObject(null);
+            canvas.setActiveObject(current);
+            selectElement(id);
+            setActiveTool('select');
+          });
+        }
+    });
+
+    canvas.renderAll;
+
+  }, [elements, copyToggle]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (!deleteToggle) {
+      return;
+    }
+
+    toggleDelete();
+
+    const elementsMap = new Map<string, Element>(
+      elements
+              .map((el) => [el.id, el])
+    );
+    
+      canvas.getActiveObjects().forEach((obj) => {
+        if (!elementsMap.has((obj as ExtendedFabricObject).data?.id)) {
+          canvas.remove(obj);
+        }
+    });
+
+    setCurrentObject(null);
+    setActiveTool('select');
+
+    canvas.renderAll;
+
+  }, [elements, deleteToggle]);
 
   return {
     canvas: canvasRef.current,

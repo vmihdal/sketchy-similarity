@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Trash, AlignLeft, AlignCenter, AlignRight, AlignJustify, ArrowDown, ArrowUp, MoveDown, MoveUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FabricObject, InteractiveFabricObject } from "fabric";
+import { toast } from "@/components/ui/use-toast";
 
 interface ColorOption {
   color: string;
@@ -59,9 +61,9 @@ const ALIGN_OPTIONS = [
 ];
 
 export const OptionsPanel = () => {
-  const { elements, updateElement } = useElementStore();
-  const { setActiveColor, setStrokeWidth, setFillColor } = useToolStore();
-  
+  const { elements, updateElement, addElement } = useElementStore();
+  const { setActiveColor, setStrokeWidth, setFillColor, setStrokeDashArray, setCornerRadius, toggleCopy, toggleDelete } = useToolStore();
+
   // Local state for currently selected object properties
   const [currentStrokeColor, setCurrentStrokeColor] = useState("#1e1e1e");
   const [currentFillColor, setCurrentFillColor] = useState("transparent");
@@ -75,21 +77,55 @@ export const OptionsPanel = () => {
   useEffect(() => {
 
     elements.filter((el) => el.selected).forEach((selectedElement) => {
-        if (selectedElement.object) {
-          // Get the properties from the selected object
-          const stroke = selectedElement.object.stroke || "#1e1e1e";
-          const width = selectedElement.object.strokeWidth || 2;
-          const fill = selectedElement.object.fill || "transparent";
-          const opacity = selectedElement.object.opacity ? selectedElement.object.opacity * 100 : 100;
-          
-          // Update local state
-          setCurrentStrokeColor(stroke);
-          setCurrentStrokeWidth(width);
-          setCurrentFillColor(fill === "" ? "transparent" : fill);
-          setCurrentOpacity(opacity);
-        }
+      if (selectedElement.object) {
+        // Get the properties from the selected object
+        const stroke = selectedElement.object.stroke || "#1e1e1e";
+        const width = selectedElement.object.strokeWidth || 2;
+        const fill = selectedElement.object.fill || "transparent";
+        const opacity = selectedElement.object.opacity ? selectedElement.object.opacity * 100 : 100;
+
+        // Update local state
+        setCurrentStrokeColor(stroke);
+        setCurrentStrokeWidth(width);
+        setCurrentFillColor(fill === "" ? "transparent" : fill);
+        setCurrentOpacity(opacity);
+      }
     })
-    
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only process shortcuts when not in an input field
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (e.repeat) return;
+
+      switch (e.key.toLowerCase()) {
+        case "backspace":
+          e.preventDefault();
+          handleDelete();
+          break;
+        case "delete":
+          e.preventDefault();
+          handleDelete();
+          break;
+        case "d":
+          if (e.ctrlKey) {
+            e.preventDefault();
+            handleCopy()
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+
   }, [elements]);
 
   // Apply changes to the selected object
@@ -101,7 +137,7 @@ export const OptionsPanel = () => {
         object: { ...elements.find(el => el.id === selectedElement.id)?.object, stroke: color, dirty: true }
       });
     })
-    
+
     setActiveColor(color);
   };
 
@@ -110,8 +146,8 @@ export const OptionsPanel = () => {
 
     elements.filter((el) => el.selected).forEach((selectedElement) => {
       updateElement(selectedElement.id, {
-        object: { 
-          ...elements.find(el => el.id === selectedElement.id)?.object, 
+        object: {
+          ...elements.find(el => el.id === selectedElement.id)?.object,
           fill: color, dirty: true
         }
       });
@@ -132,19 +168,40 @@ export const OptionsPanel = () => {
 
   const handleOpacityChange = (value: number[]) => {
     const opacity = value[0];
-    setCurrentOpacity(opacity);
 
     elements.filter((el) => el.selected).forEach((selectedElement) => {
       updateElement(selectedElement.id, {
         object: { ...elements.find(el => el.id === selectedElement.id)?.object, opacity: opacity / 100 }
       });
     })
+
+    setCurrentOpacity(opacity);
   };
 
   const handleStrokeStyleChange = (style: string) => {
+
+    let strokeDashArray = null;
+
+    switch (style) {
+      case 'dotted':
+        strokeDashArray = [3, 5]
+        break
+      case 'dashed':
+        strokeDashArray = [5, 5]
+        break
+      default:
+        strokeDashArray = null
+        break
+    }
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+      updateElement(selectedElement.id, {
+        object: { ...elements.find(el => el.id === selectedElement.id)?.object, strokeDashArray, dirty: true }
+      });
+    });
+
     setCurrentStrokeStyle(style);
-    // Placeholder for future implementation
-    console.log(`Stroke style changed to ${style}`);
+    setStrokeDashArray(strokeDashArray);
   };
 
   const handleSlopinessChange = (level: number) => {
@@ -154,9 +211,17 @@ export const OptionsPanel = () => {
   };
 
   const handleEdgeStyleChange = (style: string) => {
+
+    let cornerRadius = style == 'round' ? 20 : null;
+
+    elements.filter((el) => el.selected).forEach((selectedElement) => {
+      updateElement(selectedElement.id, {
+        cornerRadius
+      });
+    });
+
     setCurrentEdgeStyle(style);
-    // Placeholder for future implementation
-    console.log(`Edge style changed to ${style}`);
+    setCornerRadius(cornerRadius);
   };
 
   const handleAlign = (alignment: string) => {
@@ -174,7 +239,15 @@ export const OptionsPanel = () => {
     elements.filter((el) => el.selected).forEach((selectedElement) => {
       useElementStore.getState().removeElement(selectedElement.id);
     })
+
+    toggleDelete()
   };
+
+  const handleCopy = () => {
+    toggleCopy()
+  };
+
+
 
   return (
     <div className="fixed right-4 top-20 w-60 bg-white rounded-lg shadow-lg p-4 space-y-5 overflow-y-auto max-h-[calc(100vh-120px)]">
@@ -236,12 +309,12 @@ export const OptionsPanel = () => {
               )}
               onClick={() => handleStrokeWidthChange(width)}
             >
-              <div 
-                className="bg-black rounded-full" 
-                style={{ 
-                  height: `${width}px`, 
-                  width: '24px' 
-                }} 
+              <div
+                className="bg-black rounded-full"
+                style={{
+                  height: `${width}px`,
+                  width: '24px'
+                }}
               />
             </button>
           ))}
@@ -284,7 +357,7 @@ export const OptionsPanel = () => {
       </div>
 
       {/* Sloppiness */}
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <h3 className="text-sm font-medium">Sloppiness</h3>
         <div className="grid grid-cols-3 gap-2">
           {SLOPPINESS_LEVELS.map((level) => (
@@ -310,7 +383,7 @@ export const OptionsPanel = () => {
             </button>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {/* Edges */}
       <div className="space-y-2">
@@ -327,12 +400,12 @@ export const OptionsPanel = () => {
             >
               {edge.value === "sharp" && (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="6" y="6" width="12" height="12" stroke="black" strokeWidth="1.5" strokeDasharray="3 3" fill="none"/>
+                  <path d="M4 4H12V6H6V12H4V4Z" stroke="black" strokeWidth="2" />
                 </svg>
               )}
               {edge.value === "round" && (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="6" y="6" width="12" height="12" rx="2" stroke="black" strokeWidth="1.5" strokeDasharray="3 3" fill="none"/>
+                  <path d="M4 10C4 6.68629 6.68629 4 10 4H14" stroke="black" strokeWidth="2" fill="none" />
                 </svg>
               )}
             </button>
@@ -359,7 +432,7 @@ export const OptionsPanel = () => {
       </div>
 
       {/* Layers */}
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <h3 className="text-sm font-medium">Layers</h3>
         <div className="grid grid-cols-4 gap-2">
           <Button
@@ -395,10 +468,10 @@ export const OptionsPanel = () => {
             <MoveUp className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </div> */}
 
       {/* Align */}
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <h3 className="text-sm font-medium">Align</h3>
         <div className="grid grid-cols-3 gap-2">
           {ALIGN_OPTIONS.slice(0, 3).map((option) => (
@@ -426,7 +499,7 @@ export const OptionsPanel = () => {
             </Button>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {/* Actions */}
       <div className="space-y-2">
@@ -436,12 +509,9 @@ export const OptionsPanel = () => {
             variant="ghost"
             size="icon"
             className="bg-purple-50 hover:bg-purple-100"
-            onClick={() => console.log("Copy")}
+            onClick={handleCopy}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-              <rect x="6" y="6" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-            </svg>
+            <svg aria-hidden="true" focusable="false" role="img" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><g strokeWidth="1.25"><path d="M14.375 6.458H8.958a2.5 2.5 0 0 0-2.5 2.5v5.417a2.5 2.5 0 0 0 2.5 2.5h5.417a2.5 2.5 0 0 0 2.5-2.5V8.958a2.5 2.5 0 0 0-2.5-2.5Z"></path><path clipRule="evenodd" d="M11.667 3.125c.517 0 .986.21 1.325.55.34.338.55.807.55 1.325v1.458H8.333c-.485 0-.927.185-1.26.487-.343.312-.57.75-.609 1.24l-.005 5.357H5a1.87 1.87 0 0 1-1.326-.55 1.87 1.87 0 0 1-.549-1.325V5c0-.518.21-.987.55-1.326.338-.34.807-.549 1.325-.549h6.667Z"></path></g></svg>
           </Button>
           <Button
             variant="ghost"
@@ -451,7 +521,7 @@ export const OptionsPanel = () => {
           >
             <Trash className="h-4 w-4" />
           </Button>
-          <Button
+          {/* <Button
             variant="ghost"
             size="icon"
             className="bg-purple-50 hover:bg-purple-100"
@@ -465,7 +535,7 @@ export const OptionsPanel = () => {
               <path d="M4 4H2" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M13 5H11" stroke="currentColor" strokeWidth="1.5"/>
             </svg>
-          </Button>
+          </Button> */}
         </div>
       </div>
     </div>
