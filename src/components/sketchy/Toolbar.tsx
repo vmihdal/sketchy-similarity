@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToolStore } from "@/store/tool-store";
-import { Circle, MousePointer, Pencil, Square, Slash, Hand } from "lucide-react";
+import { Circle, MousePointer, Pencil, Square, Slash, Hand, ALargeSmall } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useElementStore } from "@/store/element-store";
 
@@ -17,6 +17,7 @@ export const Toolbar = () => {
     { name: "rectangle", icon: Square, tooltip: "Rectangle (R)" },
     { name: "circle", icon: Circle, tooltip: "Circle (C)" },
     { name: "line", icon: Slash, tooltip: "Line (L)" },
+    { name: "text", icon: ALargeSmall, tooltip: "Text box (T)" },
   ];
 
   return (

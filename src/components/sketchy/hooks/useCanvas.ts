@@ -11,7 +11,8 @@ import {
   ModifiedEvent,
   ActiveSelection,
   Polyline,
-  Image
+  Image,
+  Textbox
 } from 'fabric';
 import { useToolStore } from '@/store/tool-store';
 import { useElementStore, Element, FabricObjectData } from '@/store/element-store';
@@ -63,13 +64,30 @@ export const useCanvas = (canvasId: string) => {
     // Set up event handlers for object selection
     canvas.on('selection:created', (options) => {
       handleObjectSelection(options);
+
+      canvas.getActiveObjects().forEach((obj) => {
+        if (obj.type == 'textbox') {
+          (obj as Textbox).enterEditing()
+        }})
     });
 
     canvas.on('selection:updated', (options) => {
       handleObjectSelection(options);
+
+      canvas.getActiveObjects().forEach((obj) => {
+        if (obj.type == 'textbox') {
+          (obj as Textbox).enterEditing()
+        }})
     });
 
-    canvas.on('selection:cleared', () => selectElement(null));
+    canvas.on('selection:cleared', () => {
+      selectElement(null);
+
+      canvas.getObjects().forEach((obj) => {
+        if (obj.type == 'textbox') {
+          (obj as Textbox).exitEditing()
+        }})
+    });
 
     // Set up event handlers for object modifications
     canvas.on('object:modified', (options) => {
@@ -275,6 +293,7 @@ export const useCanvas = (canvasId: string) => {
         let obj: ExtendedFabricObject | null = null;
 
         switch (activeTool) {
+          case 'text':
           case 'rectangle': {
             const rect = new Rect({
               left: pointer.x,
@@ -349,6 +368,7 @@ export const useCanvas = (canvasId: string) => {
         const pointer = canvas.getPointer(options.e);
 
         switch (activeTool) {
+          case 'text':
           case 'rectangle': {
             const rect = currentObject as unknown as Rect;
             const width = Math.abs(pointer.x - startPoint.x);
@@ -415,7 +435,28 @@ export const useCanvas = (canvasId: string) => {
           // line.setDimensions()
           line.set({ points: line.points, dirty: true });
           createControls(canvasRef, line)
-        } else {
+        } if (activeTool == 'text' ) {
+          const bounds = currentObject.getBoundingRect();
+          canvas.remove(currentObject);
+
+          const defaultProps = getDefaultObjectProps(activeColor, strokeWidth, fillColor, strokeDashArray, cornerRadius);
+
+          const textbox = new Textbox("Sample text", {
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
+            editable: true,
+            selectable: true
+          });
+          textbox.setCoords();
+          textbox.enterEditing();
+          canvas.add(textbox);
+          setCurrentObject(textbox);
+        }
+
+        if (activeTool != 'line')
+        {
           currentObject.set({ selectable: true });
         }
         
@@ -423,16 +464,20 @@ export const useCanvas = (canvasId: string) => {
         const id = generateUniqueId();
         currentObject.data = { id };
 
-        // Add to store
-        addElement({
+        let element = {
           id,
           type: currentObject.type || '',
           object: fabricObjectToData(currentObject),
           isModified: false,
           selected: false,
-          cornerRadius
-        });
+        } as Element;
 
+        if (activeTool != 'text') {
+          element.cornerRadius = cornerRadius;
+        }
+
+        // Add to store
+        addElement(element);
         setCurrentObject(null);
         setStartPoint(null);
         canvas.setActiveObject(currentObject);

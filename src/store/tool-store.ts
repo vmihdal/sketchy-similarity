@@ -2,7 +2,7 @@
 import { create } from "zustand";
 
 interface ToolState {
-  activeTool: "select" | "pencil" | "rectangle" | "circle" | "line" | "pan";
+  activeTool: "select" | "pencil" | "rectangle" | "circle" | "line" | "pan" | "text";
   activeColor: string;
   strokeWidth: number;
   fillColor: string;
